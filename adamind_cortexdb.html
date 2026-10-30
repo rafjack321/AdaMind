@@ -1,0 +1,3916 @@
+<!DOCTYPE html>
+<!-- AdaMind CortexDB v0.2.1 — Neuro-RAG Wissensdatenbank -->
+<!-- Geprüfte & fehlerbereinigte Browser-Laufzeitumgebung -->
+<html lang="de" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AdaMind CortexDB v0.2.0 — Neuro-RAG Wissensdatenbank</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- PDF.js (Clientseitige PDF-Extraktion mit exakter Seitenzuordnung) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <!-- JSZip (Clientseitige EPUB-Container- & OPF-Spine-Extraktion) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- Typografie: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          },
+          colors: {
+            neuro: {
+              950: '#040711',
+              900: '#090f1f',
+              850: '#0e172d',
+              800: '#152240'
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #050914; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+    body {
+      background-color: #040711;
+      background-image:
+        radial-gradient(circle at 12% 8%, rgba(6, 182, 212, 0.08), transparent 34%),
+        radial-gradient(circle at 88% 12%, rgba(139, 92, 246, 0.08), transparent 34%),
+        radial-gradient(circle at 50% 92%, rgba(16, 185, 129, 0.05), transparent 40%);
+    }
+
+    .glass-card {
+      background: rgba(11, 18, 35, 0.86);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(51, 65, 85, 0.55);
+    }
+
+    input[type="range"] {
+      accent-color: #06b6d4;
+    }
+
+    /* Markdown-Formatierung für KI-Antworten */
+    .md-prose h1, .md-prose h2, .md-prose h3 {
+      color: #f8fafc;
+      font-weight: 700;
+      margin-top: 0.75rem;
+      margin-bottom: 0.35rem;
+    }
+    .md-prose h1 { font-size: 1rem; }
+    .md-prose h2 { font-size: 0.92rem; }
+    .md-prose h3 { font-size: 0.85rem; }
+    .md-prose p { margin-bottom: 0.55rem; line-height: 1.62; }
+    .md-prose ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.6rem; }
+    .md-prose ol { list-style-type: decimal; padding-left: 1.25rem; margin-bottom: 0.6rem; }
+    .md-prose li { margin-bottom: 0.22rem; line-height: 1.55; }
+    .md-prose pre {
+      background: #03060f;
+      border: 1px solid rgba(51, 65, 85, 0.75);
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      overflow-x: auto;
+      margin: 0.6rem 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.74rem;
+      color: #e2e8f0;
+    }
+    .md-prose code.inline-code {
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      color: #67e8f9;
+      padding: 0.1rem 0.35rem;
+      border-radius: 0.35rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+    }
+    .md-prose table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.6rem 0;
+      font-size: 0.75rem;
+    }
+    .md-prose th, .md-prose td {
+      border: 1px solid rgba(51, 65, 85, 0.7);
+      padding: 0.4rem 0.55rem;
+      text-align: left;
+    }
+    .md-prose th { background: rgba(15, 23, 42, 0.9); color: #cbd5e1; }
+    .md-prose blockquote {
+      border-left: 3px solid #06b6d4;
+      padding-left: 0.75rem;
+      color: #94a3b8;
+      margin: 0.5rem 0;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.92); }
+    }
+    .pulse-live { animation: pulse-dot 2.2s ease-in-out infinite; }
+  </style>
+</head>
+<body class="text-slate-200 font-sans antialiased min-h-screen flex flex-col selection:bg-cyan-500/30 selection:text-cyan-100">
+
+  <!-- ===================================================================== -->
+  <!-- TOAST-CONTAINER (Kein alert() oder confirm() im gesamten System)      -->
+  <!-- ===================================================================== -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-md w-full pointer-events-none px-3 sm:px-0"></div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 1: KI-MODELLE & API-KEYS KONFIGURATION                          -->
+  <!-- ===================================================================== -->
+  <div id="aiModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+    <div class="glass-card rounded-2xl max-w-2xl w-full p-5 sm:p-6 border-cyan-500/40 shadow-2xl my-auto">
+      <div class="flex items-start justify-between gap-3 mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-400/40 flex items-center justify-center text-cyan-300 text-lg font-bold">
+            🤖
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-white">KI-Synthese-Kerne & API-Verbindungen</h2>
+            <p class="text-xs text-slate-400">Wähle zwischen sofort nutzbarer kostenloser KI, Google Gemini API oder GitHub / Microsoft Copilot</p>
+          </div>
+        </div>
+        <button id="closeAiModalBtn" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">✕</button>
+      </div>
+
+      <!-- Provider-Auswahl Tabs -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4" id="modalProviderCards">
+        <button data-prov="free" class="prov-card text-left p-3 rounded-xl border transition bg-cyan-950/40 border-cyan-400/60">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-bold text-white">⚡ Kostenlose KI</span>
+            <span class="px-1.5 py-0.5 text-[10px] rounded bg-emerald-500/20 text-emerald-300 font-mono">Ohne Key</span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-snug">Canvas-Gemini / Free-Cloud + lokaler AdaMind Neuro-Synthesizer</p>
+        </button>
+
+        <button data-prov="gemini" class="prov-card text-left p-3 rounded-xl border transition bg-slate-950/70 border-slate-800 hover:border-slate-700">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-bold text-white">✨ Google Gemini</span>
+            <span class="px-1.5 py-0.5 text-[10px] rounded bg-cyan-500/20 text-cyan-300 font-mono">API-Key</span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-snug">Gemini 2.5 Flash/Pro inkl. nativem Google Search Grounding</p>
+        </button>
+
+        <button data-prov="copilot" class="prov-card text-left p-3 rounded-xl border transition bg-slate-950/70 border-slate-800 hover:border-slate-700">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-bold text-white">🧭 GitHub / Copilot</span>
+            <span class="px-1.5 py-0.5 text-[10px] rounded bg-violet-500/20 text-violet-300 font-mono">Bearer Key</span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-snug">Copilot API, GitHub Models (GPT-4o / 4.1) & OpenAI-Gateways</p>
+        </button>
+      </div>
+
+      <!-- Sektion A: Kostenlose KI Einstellungen -->
+      <div id="provSectionFree" class="space-y-3 p-4 rounded-xl bg-slate-950/80 border border-slate-800">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-emerald-300">Sofort einsatzbereit — keine Registrierung erforderlich</span>
+          <span class="text-[11px] font-mono text-slate-400">Fallback-Garantie: 100%</span>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-300 mb-1">Ausführungsstrategie der kostenlosen KI</label>
+          <select id="freeAiStrategySelect" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:border-cyan-400 focus:outline-none">
+            <option value="cascade">Auto-Kaskade: Integrierte Gemini-Bridge → Pollinations OpenAI → Lokaler Neuro-Synthesizer</option>
+            <option value="pollinations">Direkt: Kostenloser Cloud-Endpunkt (Pollinations OpenAI-kompatibel) → Lokal Fallback</option>
+            <option value="local_only">100% Offline: Reiner lokaler AdaMind Neuro-Synthesizer (0 Bytes Netzwerkverkehr)</option>
+          </select>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-relaxed">
+          Im Auto-Modus nutzt CortexDB zuerst die latenzarme KI-Schnittstelle bzw. den freien CORS-Endpunkt <span class="font-mono text-slate-300">text.pollinations.ai/openai</span>. Sollte keine Internetverbindung bestehen, synthetisiert der eingebaute <strong>AdaMind Neuro-Synthesizer</strong> deterministisch eine quellenbelegte Antwort direkt aus den SDR/BM25+-Chunks.
+        </p>
+      </div>
+
+      <!-- Sektion B: Google Gemini API Einstellungen -->
+      <div id="provSectionGemini" class="hidden space-y-3 p-4 rounded-xl bg-slate-950/80 border border-slate-800">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Google AI Studio — Gemini API Key</label>
+          <div class="relative flex items-center">
+            <input id="geminiApiKeyInput" type="password" autocomplete="off" placeholder="AIzaSy..." class="w-full pl-3 pr-10 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-cyan-400 focus:outline-none text-xs font-mono text-white" />
+            <button type="button" data-toggle-pw="geminiApiKeyInput" class="absolute right-2.5 text-xs text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-slate-800" title="API-Key ein-/ausblenden">👁</button>
+          </div>
+          <p class="text-[10px] text-slate-500 mt-1">Wird ausschließlich lokal in deinem Browser verwendet und direkt an <span class="font-mono">generativelanguage.googleapis.com</span> gesendet.</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs text-slate-300 mb-1">Gemini Modell-Vorauswahl</label>
+            <select id="geminiModelPreset" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:border-cyan-400 focus:outline-none">
+              <option value="gemini-3-flash-preview">gemini-3-flash-preview (Empfohlen)</option>
+              <option value="gemini-2.5-flash">gemini-2.5-flash (Schnell & Präzise)</option>
+              <option value="gemini-2.5-pro">gemini-2.5-pro (Tiefenanalyse)</option>
+              <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-slate-300 mb-1">Exakte Modell-ID (frei editierbar)</label>
+            <input id="geminiModelCustom" type="text" value="gemini-3-flash-preview" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-cyan-400 focus:outline-none text-xs font-mono text-cyan-200" />
+          </div>
+        </div>
+
+        <label class="flex items-center gap-2 text-xs text-slate-300 pt-1 cursor-pointer">
+          <input id="chkGeminiSearchGrounding" type="checkbox" checked class="rounded bg-slate-900 border-slate-700 text-cyan-500" />
+          <span>Bei aktivem Online-Schalter natives <strong>Google Search Grounding</strong> (<span class="font-mono text-cyan-300">google_search</span>) einschalten</span>
+        </label>
+      </div>
+
+      <!-- Sektion C: GitHub / Microsoft Copilot Einstellungen -->
+      <div id="provSectionCopilot" class="hidden space-y-3 p-4 rounded-xl bg-slate-950/80 border border-slate-800">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Copilot / GitHub Models / OpenAI Bearer API-Key oder Token</label>
+          <div class="relative flex items-center">
+            <input id="copilotApiKeyInput" type="password" autocomplete="off" placeholder="github_pat_... / ghu_... / sk-..." class="w-full pl-3 pr-10 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-violet-400 focus:outline-none text-xs font-mono text-white" />
+            <button type="button" data-toggle-pw="copilotApiKeyInput" class="absolute right-2.5 text-xs text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-slate-800" title="Token ein-/ausblenden">👁</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs text-slate-300 mb-1">Endpunkt-Profil</label>
+            <select id="copilotEndpointPreset" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:border-violet-400 focus:outline-none">
+              <option value="https://models.github.ai/inference/chat/completions">GitHub Models / Copilot AI (CORS-direkt)</option>
+              <option value="https://api.githubcopilot.com/chat/completions">GitHub Copilot Chat API (ghu_/gho_ Exchange)</option>
+              <option value="https://api.openai.com/v1/chat/completions">OpenAI / Custom Copilot-Gateway</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-slate-300 mb-1">Modell-Auswahl (editierbar)</label>
+            <div class="flex gap-1.5">
+              <select id="copilotModelPreset" class="w-1/2 px-2 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none">
+                <option value="gpt-4o">gpt-4o</option>
+                <option value="gpt-4.1">gpt-4.1</option>
+                <option value="gpt-4o-mini">gpt-4o-mini</option>
+                <option value="o3-mini">o3-mini</option>
+              </select>
+              <input id="copilotModelCustom" type="text" value="gpt-4o" class="w-1/2 px-2.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-violet-200 focus:border-violet-400 focus:outline-none" />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs text-slate-300 mb-1">Vollständige Chat-Completions Endpoint-URL</label>
+          <input id="copilotEndpointUrl" type="text" value="https://models.github.ai/inference/chat/completions" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-violet-400 focus:outline-none text-xs font-mono text-slate-200" />
+        </div>
+      </div>
+
+      <!-- Verbindungstest-Diagnosebanner -->
+      <div id="aiTestResultBox" class="hidden mt-3 p-3 rounded-xl border text-xs font-mono leading-relaxed"></div>
+
+      <!-- Footer: Keys lokal merken + Verbindung prüfen + Speichern -->
+      <div class="mt-5 pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+          <input id="chkRememberKeys" type="checkbox" checked class="rounded bg-slate-900 border-slate-700 text-cyan-500" />
+          <span>Einstellungen & Keys lokal im Browser speichern</span>
+        </label>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btnTestAiConnection" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 transition">
+            🔌 Verbindung prüfen
+          </button>
+          <button id="btnSaveAiModal" class="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg transition">
+            Übernehmen & Aktivieren
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 2: ZERO-WIPE SICHERHEITSBESTÄTIGUNG                             -->
+  <!-- ===================================================================== -->
+  <div id="wipeModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+    <div class="glass-card rounded-2xl max-w-md w-full p-6 border-rose-500/50 shadow-2xl">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 font-bold">☢️</div>
+        <div>
+          <h3 class="text-base font-bold text-white">VolatileVault Zero-Wipe ausführen?</h3>
+          <p class="text-xs font-mono text-rose-300">Deterministische 0x00 Löschung + IndexedDB Purge</p>
+        </div>
+      </div>
+      <p class="text-xs text-slate-300 leading-relaxed mb-5">
+        Überschreibt alle <span class="font-mono text-white">2048-Bit SDR TypedArrays</span>, den <span class="font-mono text-white">BM25+ Index</span>, das Arbeitsgedächtnis, den <span class="font-mono text-white">64-Byte IsolatedBridge</span>-Puffer sowie alle gespeicherten Dokumente in <span class="font-mono text-white">IndexedDB</span> vollständig.
+      </p>
+      <div class="flex justify-end gap-2">
+        <button id="cancelWipeBtn" class="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition">Abbrechen</button>
+        <button id="confirmWipeBtn" class="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition">Zero-Wipe jetzt ausführen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TOP HEADER & TELEMETRIE-LEISTE                                        -->
+  <!-- ===================================================================== -->
+  <header class="sticky top-0 z-30 glass-card border-b border-slate-800/80 px-3 sm:px-5 py-2.5">
+    <div class="max-w-[1760px] mx-auto flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2.5">
+      <!-- Logo & Sandbox Status -->
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/25 to-violet-500/25 border border-cyan-400/40 flex items-center justify-center">
+            <svg class="w-5 h-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+              <polygon points="12 2 21 7 21 17 12 22 3 17 3 7 12 2" />
+              <circle cx="12" cy="12" r="3" class="fill-cyan-400/40" />
+              <line x1="12" y1="2" x2="12" y2="9" />
+              <line x1="12" y1="15" x2="12" y2="22" />
+              <line x1="3" y1="7" x2="9.4" y2="10.5" />
+              <line x1="14.6" y1="13.5" x2="21" y2="17" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-sm sm:text-base font-bold text-white tracking-tight">AdaMind CortexDB</h1>
+              <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">v0.2.0 Neuro-RAG</span>
+            </div>
+            <p class="text-[11px] text-slate-400">2048-Bit SDR + BM25+ Hybrid-Wissensdatenbank · Lokal & Live-Web KI</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-[11px] font-mono text-emerald-300">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-live"></span>
+          <span id="storageBadgeHeader">IndexedDB Aktiv</span>
+        </div>
+      </div>
+
+      <!-- KPIs & Schnellaktionen -->
+      <div class="flex flex-wrap items-center justify-between xl:justify-end gap-2">
+        <div class="grid grid-cols-2 sm:flex items-center gap-1.5 w-full sm:w-auto">
+          <div class="px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800">
+            <span class="block text-[9px] uppercase tracking-wider text-slate-400">Wissensbasis</span>
+            <span id="kpiCorpus" class="text-xs font-mono font-semibold text-white">0 Dok · 0 Chunks</span>
+          </div>
+          <div class="px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800">
+            <span class="block text-[9px] uppercase tracking-wider text-slate-400">Hybrid-Abruf</span>
+            <span id="kpiLatency" class="text-xs font-mono font-semibold text-cyan-300">0.00 ms</span>
+          </div>
+          <div class="px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800">
+            <span class="block text-[9px] uppercase tracking-wider text-slate-400">Free Energy (F)</span>
+            <span id="kpiFreeEnergy" class="text-xs font-mono font-semibold text-emerald-300">0.032</span>
+          </div>
+          <button id="headerProviderPill" class="px-2.5 py-1 rounded-xl bg-cyan-950/50 hover:bg-cyan-900/50 border border-cyan-500/40 text-left transition" title="KI-Modell & API-Keys konfigurieren">
+            <span class="block text-[9px] uppercase tracking-wider text-cyan-300">Aktiver KI-Kern ⚙</span>
+            <span id="kpiActiveModel" class="text-xs font-mono font-semibold text-white">Kostenlose KI</span>
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button id="btnOpenAiModal" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-cyan-600/20 hover:bg-cyan-600/35 text-cyan-200 border border-cyan-500/40 transition">
+            🤖 KI & API-Keys
+          </button>
+          <button id="btnBenchmark" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition">
+            ⚡ +1.000 Chunks
+          </button>
+          <button id="btnSleepCycle" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-violet-600/20 hover:bg-violet-600/35 text-violet-200 border border-violet-500/40 transition">
+            🌙 Schlaf (NREM/REM)
+          </button>
+          <button id="btnZeroWipe" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-950/70 hover:bg-rose-900/80 text-rose-300 border border-rose-500/40 transition">
+            Zero-Wipe
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- HAUPTARBEITSBEREICH (DREISPALTIGES RESPONSIVE NEURO-LAYOUT)           -->
+  <!-- ===================================================================== -->
+  <main class="flex-1 max-w-[1760px] w-full mx-auto p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <!-- =================================================================== -->
+    <!-- SPALTE LINKS (3 Cols): MULTI-FORMAT IMPORT & DOKUMENTEN-EXPLORER    -->
+    <!-- =================================================================== -->
+    <aside class="lg:col-span-3 flex flex-col gap-4">
+
+      <!-- 1. Datei-Import (.txt, .md, .pdf, .epub) + URL & Direkttext -->
+      <div class="glass-card rounded-2xl p-4 shadow-xl space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+            <span>Multi-Format Wissens-Import</span>
+          </h2>
+          <span class="text-[10px] font-mono text-slate-400">700–950 Chr · 150 Overlap</span>
+        </div>
+
+        <!-- Drag & Drop Zone -->
+        <label
+          id="dropZone"
+          class="group block rounded-xl border-2 border-dashed border-slate-700 hover:border-cyan-400 bg-slate-950/70 hover:bg-cyan-950/20 p-4 text-center cursor-pointer transition"
+        >
+          <input id="filePickerInput" type="file" multiple accept=".txt,.md,.markdown,.pdf,.epub" class="hidden" />
+          <div class="w-9 h-9 mx-auto mb-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-300 group-hover:scale-105 transition">
+            📥
+          </div>
+          <div class="text-xs font-semibold text-white">Dateien hierher ziehen oder auswählen</div>
+          <p class="text-[11px] text-slate-400 mt-1">Mehrfach-Import mit Seiten- & Kapitel-Extraktion</p>
+          <div class="flex flex-wrap justify-center gap-1.5 mt-2.5 text-[10px] font-mono">
+            <span class="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30">.PDF</span>
+            <span class="px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30">.EPUB</span>
+            <span class="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">.MD</span>
+            <span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">.TXT</span>
+          </div>
+        </label>
+
+        <!-- Echtzeit-Import-Fortschrittsanzeige -->
+        <div id="importProgressBox" class="hidden p-2.5 rounded-xl bg-slate-950 border border-cyan-500/40 space-y-1.5">
+          <div class="flex justify-between text-[11px] font-mono">
+            <span id="importProgressLabel" class="text-cyan-300 truncate">Extrahiere...</span>
+            <span id="importProgressPct" class="text-white">0%</span>
+          </div>
+          <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div id="importProgressBar" class="h-full bg-gradient-to-r from-cyan-400 to-violet-400 transition-all duration-150" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Live-URL Import -->
+        <div class="pt-1 border-t border-slate-800/80">
+          <label class="block text-[11px] font-medium text-slate-300 mb-1">🌐 Webseite / Online-Artikel direkt indizieren</label>
+          <div class="flex gap-1.5">
+            <input id="urlImportInput" type="url" placeholder="https://de.wikipedia.org/wiki/..." class="flex-1 min-w-0 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-cyan-400 focus:outline-none text-xs text-white font-mono" />
+            <button id="btnImportUrl" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 shrink-0 transition">
+              Laden
+            </button>
+          </div>
+        </div>
+
+        <!-- Manuelle Text-/Notiz-Einspeisung -->
+        <details class="rounded-xl bg-slate-950/70 border border-slate-800 p-2.5">
+          <summary class="text-xs font-semibold text-slate-300 cursor-pointer select-none flex items-center justify-between">
+            <span>✍️ Freitext / Markdown-Notiz einfügen</span>
+            <span class="text-slate-500 text-[10px]">▼</span>
+          </summary>
+          <div class="mt-2.5 space-y-2">
+            <input id="rawNoteTitle" type="text" placeholder="Dokumenttitel (z. B. Laborprotokoll #4)" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:border-cyan-400 focus:outline-none" />
+            <textarea id="rawNoteBody" rows="3" placeholder="Beliebigen Text, Markdown oder Code einfügen..." class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:border-cyan-400 focus:outline-none"></textarea>
+            <button id="btnAddRawNote" class="w-full py-1.5 rounded-lg text-xs font-semibold bg-cyan-600/25 hover:bg-cyan-600/40 text-cyan-200 border border-cyan-500/40 transition">
+              In SDR + BM25+ indizieren
+            </button>
+          </div>
+        </details>
+      </div>
+
+      <!-- 2. Dokumenten-Explorer mit aktivem Quell-Filter -->
+      <div class="glass-card rounded-2xl p-4 shadow-xl flex flex-col">
+        <div class="flex items-center justify-between gap-2 mb-2.5">
+          <div>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dokumenten-Explorer</h2>
+            <p class="text-[10px] text-slate-400">Häkchen steuert aktive RAG-Quellen</p>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button id="btnToggleAllDocs" class="px-2 py-1 rounded-lg text-[10px] font-mono bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition">Alle An/Aus</button>
+            <button id="btnRestoreDemo" class="px-2 py-1 rounded-lg text-[10px] font-mono bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-800 transition" title="Vorinstallierte Demo-Dokumente laden">Demo+</button>
+          </div>
+        </div>
+
+        <div id="docExplorerList" class="space-y-2 max-h-[340px] overflow-y-auto pr-1"></div>
+
+        <!-- Persistenz-Steuerung & JSON Backup -->
+        <div class="mt-3 pt-3 border-t border-slate-800/80 space-y-2.5">
+          <label class="flex items-center justify-between text-xs cursor-pointer">
+            <span class="text-slate-300 font-medium">Lokale Persistenz (<span class="font-mono text-cyan-300">IndexedDB</span>)</span>
+            <input id="chkPersistenceMode" type="checkbox" checked class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-cyan-500" />
+          </label>
+          <div class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-slate-950/90 border border-slate-800 text-[11px] font-mono">
+            <span id="autoSaveStatusText" class="text-emerald-300 truncate">⏱ Auto-Save (60s): Bereit</span>
+            <button id="btnSaveNow" type="button" class="text-cyan-300 hover:text-cyan-100 shrink-0 transition" title="Gesamte Datenbank sofort in IndexedDB sichern">Jetzt sichern</button>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button id="btnExportSnapshot" class="py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition">
+              💾 JSON Export
+            </button>
+            <label class="py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition text-center cursor-pointer">
+              📂 JSON Import
+              <input id="snapshotFileInput" type="file" accept=".json,application/json" class="hidden" />
+            </label>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- =================================================================== -->
+    <!-- SPALTE MITTE (5 Cols): KI-WISSENS-CHAT (RAG) & <1MS VEKTORSUCHE     -->
+    <!-- =================================================================== -->
+    <section class="lg:col-span-5 flex flex-col gap-4">
+      <div class="glass-card rounded-2xl p-4 shadow-xl flex flex-col min-h-[720px]">
+
+        <!-- Top-Umschalter: KI-Synthese + RAG vs. Reine Echtzeit-Hybridsuche (<1ms) -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800/90">
+          <div class="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800 w-full sm:w-auto">
+            <button id="modeBtnRag" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 transition">
+              🧠 KI-Synthese + RAG
+            </button>
+            <button id="modeBtnFastSearch" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 border border-transparent transition">
+              ⚡ Echtzeit-Vektorsuche (&lt;1ms)
+            </button>
+          </div>
+
+          <!-- Schnellauswahl des KI-Providers direkt in der Abfrageleiste -->
+          <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+            <select id="quickProviderSelect" class="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-cyan-200 font-medium focus:border-cyan-400 focus:outline-none">
+              <option value="free">⚡ Kostenlose KI (Sofort)</option>
+              <option value="gemini">✨ Google Gemini (API-Key)</option>
+              <option value="copilot">🧭 GitHub / MS Copilot (Key)</option>
+              <option value="local_synth">🔒 Lokal Neuro-Synthesizer</option>
+            </select>
+            <button id="btnClearChat" class="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs transition" title="Chatverlauf leeren">
+              🗑
+            </button>
+          </div>
+        </div>
+
+        <!-- =============================================================== -->
+        <!-- ANSICHT 1: KI-FRAGE-ANTWORT-SYSTEM (NEURO-RAG + LIVE-ONLINE)     -->
+        <!-- =============================================================== -->
+        <div id="viewRagChat" class="flex-1 flex flex-col justify-between pt-3 gap-3">
+
+          <!-- Klickbare Beispiel-Fragen -->
+          <div class="flex flex-wrap gap-1.5" id="starterPromptsBar">
+            <button data-prompt="Wie kombiniert AdaMind 2048-Bit SDRs mit Variational Free-Energy-Konvergenz und welche Rolle spielt Acetylcholin?" class="px-2.5 py-1 rounded-lg text-[11px] bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border border-slate-800 transition">
+              🧬 SDR & Free-Energy erklären
+            </button>
+            <button data-prompt="Wie schützt das 64-Byte IsolatedBridge-Protokoll vor TOCTOU-Angriffen und epileptiformer Übererregung?" class="px-2.5 py-1 rounded-lg text-[11px] bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border border-slate-800 transition">
+              🛡 IsolatedBridge & Sandbox
+            </button>
+            <button data-prompt="Welche Unterschiede bestehen zwischen NREM- und REM-Schlaf bei der Gedächtniskonsolidierung laut Datenbank?" class="px-2.5 py-1 rounded-lg text-[11px] bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border border-slate-800 transition">
+              🌙 NREM vs. REM Konsolidierung
+            </button>
+            <button data-web="true" data-prompt="Verbinde das Datenbank-Wissen über Predictive Coding (Karl Friston) mit aktuellem Online-Wissen aus der Forschung." class="px-2.5 py-1 rounded-lg text-[11px] bg-violet-950/50 hover:bg-violet-900/50 text-violet-200 border border-violet-500/30 transition">
+              🌐 Lokal + Online: Predictive Coding
+            </button>
+          </div>
+
+          <!-- Nachrichten-Stream -->
+          <div id="chatMessages" class="flex-1 space-y-3.5 overflow-y-auto max-h-[470px] pr-1">
+            <!-- Initiale Begrüßungskarte -->
+            <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/90 text-xs text-slate-300 space-y-2">
+              <div class="flex items-center gap-2 font-semibold text-white">
+                <span class="text-cyan-400">●</span>
+                <span>AdaMind Neuro-RAG Engine v0.2.0 bereit</span>
+              </div>
+              <p class="leading-relaxed">
+                Importiere links beliebige <strong>.pdf</strong>-, <strong>.epub</strong>-, <strong>.md</strong>- oder <strong>.txt</strong>-Dokumente (oder Web-URLs) und stelle hier präzise Fragen. Jeder Abruf durchsucht parallel den <strong>2048-Bit SDR-Index</strong> und den <strong>BM25+ Volltext-Index</strong> in unter 2 Millisekunden.
+              </p>
+              <p class="text-[11px] text-slate-400">
+                Tipp: Klicke in Antworten auf ein <span class="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 font-mono">[Quelle: ...]</span>-Badge, um rechts sofort die markierte Originaltextstelle zu öffnen.
+              </p>
+            </div>
+          </div>
+
+          <!-- Untere Quellen-Schalter & Frage-Eingabeleiste -->
+          <div class="pt-2.5 border-t border-slate-800/90 space-y-2.5">
+            <!-- Kombinierte Schalter: Datenbank-Wissen (Lokal) + Online-Inhalt (Live-Web) -->
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div class="flex flex-wrap items-center gap-2">
+                <label class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-950/50 border border-cyan-500/40 text-cyan-200 cursor-pointer select-none">
+                  <input id="chkUseLocalDb" type="checkbox" checked class="rounded bg-slate-900 border-slate-700 text-cyan-500" />
+                  <span class="font-medium">🗄️ Datenbank-Wissen (Lokal)</span>
+                </label>
+
+                <label class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-950/40 border border-violet-500/35 text-violet-200 cursor-pointer select-none">
+                  <input id="chkUseOnlineWeb" type="checkbox" class="rounded bg-slate-900 border-slate-700 text-violet-500" />
+                  <span class="font-medium">🌐 Online-Inhalt (Live-Websuche)</span>
+                </label>
+              </div>
+
+              <div class="flex items-center gap-1.5 text-[11px] font-mono text-slate-400">
+                <span>Kontext:</span>
+                <select id="topKSelect" class="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-200">
+                  <option value="4">Top 4 Chunks</option>
+                  <option value="6" selected>Top 6 Chunks</option>
+                  <option value="10">Top 10 Chunks</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Eingabefeld + Senden -->
+            <div class="flex items-end gap-2">
+              <textarea
+                id="ragQuestionInput"
+                rows="2"
+                placeholder="Frage an deine Dokumente, Online-Quellen oder eine eingefügte https://-URL stellen (Enter = Senden)..."
+                class="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-cyan-400 focus:outline-none text-xs sm:text-sm text-white placeholder-slate-500 resize-none leading-relaxed"
+              ></textarea>
+              <button
+                id="btnAskAi"
+                class="px-4 py-3 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg shadow-cyan-950/50 shrink-0 transition flex items-center gap-1.5"
+              >
+                <span id="askBtnIcon">➤</span>
+                <span id="askBtnText">Abfragen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- =============================================================== -->
+        <!-- ANSICHT 2: REINE ECHTZEIT-HYBRIDSUCHE (< 1 MS OHNE LLM-LATENZ)   -->
+        <!-- =============================================================== -->
+        <div id="viewFastSearch" class="hidden flex-1 flex flex-col pt-3 gap-3">
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label for="instantSearchInput" class="text-xs font-semibold text-slate-200">Sub-Millisekunden Hybrid-Retrieval (2048-Bit SDR + BM25+)</label>
+              <span id="instantSpeedLabel" class="text-[11px] font-mono text-emerald-300">Bereit · 0.00 ms</span>
+            </div>
+            <input
+              id="instantSearchInput"
+              type="text"
+              autocomplete="off"
+              placeholder="Tippe Fachbegriffe, Zahlen, Code oder fehlerhafte Teilwörter in Echtzeit..."
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-cyan-400 focus:outline-none text-sm text-white"
+            />
+          </div>
+
+          <div id="instantResultsContainer" class="flex-1 space-y-2.5 overflow-y-auto max-h-[540px] pr-1"></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- SPALTE RECHTS (4 Cols): LIVE ADAMIND-TELEMETRIE & QUELLEN-INSPEKTOR -->
+    <!-- =================================================================== -->
+    <aside class="lg:col-span-4 flex flex-col gap-4">
+
+      <!-- 1. Live AdaMind-Telemetrie (2048-Bit SDR Canvas + Neuromodulatoren + WorkingMemory) -->
+      <div class="glass-card rounded-2xl p-4 shadow-xl space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-white">AdaMind Kortex-Telemetrie</h2>
+            <p id="matrixSubLabel" class="text-[10px] font-mono text-slate-400">64×32 Minikolumnen · Anfrage vs. Top-Treffer</p>
+          </div>
+          <div class="flex items-center gap-2 text-[10px] font-mono">
+            <span class="flex items-center gap-1 text-cyan-300"><i class="w-2 h-2 rounded-sm bg-cyan-400 inline-block"></i>Match</span>
+            <span class="flex items-center gap-1 text-rose-300"><i class="w-2 h-2 rounded-sm bg-rose-500 inline-block"></i>⊖+ On</span>
+            <span class="flex items-center gap-1 text-amber-300"><i class="w-2 h-2 rounded-sm bg-amber-400 inline-block"></i>⊖- Off</span>
+          </div>
+        </div>
+
+        <!-- 64 x 32 SDR Matrix Canvas -->
+        <div id="sdrCanvasWrap" class="w-full aspect-[2.3/1] rounded-xl overflow-hidden bg-slate-950 border border-slate-800 relative">
+          <canvas id="sdrCanvas" class="block w-full h-full"></canvas>
+        </div>
+
+        <!-- Kompakte Neuromodulator- & Somatik-Balken -->
+        <div class="grid grid-cols-2 gap-2.5 text-[11px]">
+          <div class="p-2 rounded-xl bg-slate-950/90 border border-slate-800">
+            <div class="flex justify-between mb-1">
+              <span class="text-slate-400">ACh Präzision (Π)</span>
+              <span id="teleACh" class="font-mono text-cyan-300">0.55</span>
+            </div>
+            <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+              <div id="barTeleACh" class="h-full bg-cyan-400 transition-all duration-300" style="width: 55%"></div>
+            </div>
+          </div>
+
+          <div class="p-2 rounded-xl bg-slate-950/90 border border-slate-800">
+            <div class="flex justify-between mb-1">
+              <span class="text-slate-400">Dopamin (Salienz)</span>
+              <span id="teleDA" class="font-mono text-emerald-300">0.42</span>
+            </div>
+            <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+              <div id="barTeleDA" class="h-full bg-emerald-400 transition-all duration-300" style="width: 42%"></div>
+            </div>
+          </div>
+
+          <div class="p-2 rounded-xl bg-slate-950/90 border border-slate-800">
+            <div class="flex justify-between mb-1">
+              <span class="text-slate-400">Arousal (NE Fokus)</span>
+              <span id="teleArousal" class="font-mono text-amber-300">0.28</span>
+            </div>
+            <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+              <div id="barTeleArousal" class="h-full bg-amber-400 transition-all duration-300" style="width: 28%"></div>
+            </div>
+          </div>
+
+          <div class="p-2 rounded-xl bg-slate-950/90 border border-slate-800">
+            <div class="flex justify-between mb-1">
+              <span class="text-slate-400">Valenz / Homöostase</span>
+              <span id="teleValence" class="font-mono text-violet-300">+0.30</span>
+            </div>
+            <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+              <div id="barTeleValence" class="h-full bg-violet-400 transition-all duration-300" style="width: 65%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WorkingMemory (7 NMDA Slots) & 64-Byte IsolatedBridge Ausklapper -->
+        <div class="pt-1 border-t border-slate-800/80 space-y-2">
+          <div class="flex items-center justify-between text-[11px]">
+            <span class="font-semibold text-slate-300">NMDA Arbeitsgedächtnis (<span id="wmCountText" class="font-mono text-cyan-300">0/7</span>)</span>
+            <span id="bridgeCrcMini" class="font-mono text-[10px] text-emerald-300">Bridge 64B · CRC32 OK</span>
+          </div>
+          <div id="wmChipsContainer" class="flex flex-wrap gap-1"></div>
+
+          <details class="rounded-xl bg-slate-950 border border-slate-800 p-2">
+            <summary class="text-[10px] font-mono text-slate-400 cursor-pointer select-none flex justify-between">
+              <span>IsolatedBridge v1.1 Wire-Frame (Magic b"ADAM" · 64B Header)</span>
+              <span class="text-cyan-400">Hex ▾</span>
+            </summary>
+            <pre id="bridgeHexView" class="mt-2 text-[10px] font-mono text-slate-300 overflow-x-auto leading-relaxed"></pre>
+          </details>
+        </div>
+      </div>
+
+      <!-- 2. Quellen-Inspektor (Originaltext der abgerufenen Chunks & Web-Treffer mit Highlighting) -->
+      <div class="glass-card rounded-2xl p-4 shadow-xl flex flex-col">
+        <div class="flex items-center justify-between gap-2 mb-2.5">
+          <div>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>Quellen-Inspektor & Belege</span>
+            </h2>
+            <p id="inspectorSubTitle" class="text-[10px] text-slate-400">Original-Textstellen mit Suchbegriff-Highlighting</p>
+          </div>
+          <span id="inspectorCountBadge" class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-slate-800 text-cyan-300">0 Belege</span>
+        </div>
+
+        <div id="sourceInspectorList" class="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+          <p class="text-xs text-slate-500 italic p-2">Stelle eine Frage oder klicke links auf ein Dokument, um die abgerufenen Original-Textabschnitte inklusive Seitenzahl, SDR-Overlap und BM25+-Score zu prüfen.</p>
+        </div>
+      </div>
+
+    </aside>
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- ADAMIND CORTEXDB v0.2.0 — VOLLSTÄNDIGE ENGINE & APPLICATION LOGIC     -->
+  <!-- ===================================================================== -->
+  <script>
+    (function () {
+      'use strict';
+
+      // PDF.js Worker sicher initialisieren
+      if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+
+      // Konstante für Markdown-Codezäune ohne literale Backticks im Quelltext
+      const FENCE = String.fromCharCode(96).repeat(3);
+
+      // ===================================================================
+      // 1. ARCHITEKTUR-KONSTANTEN & IEEE 802.3 CRC32 (ISOLATED BRIDGE v1.1)
+      // ===================================================================
+      const SDR_DIM = 2048;
+      const GRID_COLS = 64;
+      const GRID_ROWS = 32;
+      const ACTIVE_K = 41; // 2.0% Sparsity (41 / 2048 Minikolumnen)
+      const HEADER_SIZE = 64;
+      const MAGIC_ADAM = [0x41, 0x44, 0x41, 0x4D]; // "ADAM"
+      const BRIDGE_VERSION = 0x0101;
+
+      const CRC_TABLE = (function () {
+        const t = new Uint32Array(256);
+        for (let i = 0; i < 256; i++) {
+          let c = i;
+          for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+          t[i] = c >>> 0;
+        }
+        return t;
+      })();
+
+      function crc32(u8) {
+        let crc = 0xFFFFFFFF;
+        for (let i = 0; i < u8.length; i++) {
+          crc = CRC_TABLE[(crc ^ u8[i]) & 0xFF] ^ (crc >>> 8);
+        }
+        return (crc ^ 0xFFFFFFFF) >>> 0;
+      }
+
+      // ===================================================================
+      // 2. HILFSFUNKTIONEN (ESCAPING, TOASTS, CLIPBOARD, STOPWORDS)
+      // ===================================================================
+      function escapeHtml(str) {
+        return String(str == null ? '' : str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      function showToast(title, message, tone = 'cyan') {
+        const container = document.getElementById('toastContainer');
+        const palette = {
+          cyan: 'border-cyan-500/50 bg-slate-900/95 text-cyan-200',
+          emerald: 'border-emerald-500/50 bg-slate-900/95 text-emerald-200',
+          amber: 'border-amber-500/50 bg-slate-900/95 text-amber-200',
+          rose: 'border-rose-500/50 bg-slate-900/95 text-rose-200',
+          violet: 'border-violet-500/50 bg-slate-900/95 text-violet-200'
+        };
+        const el = document.createElement('div');
+        el.className = `pointer-events-auto rounded-xl border p-3 shadow-2xl backdrop-blur-md transition-all duration-300 ${palette[tone] || palette.cyan}`;
+        el.innerHTML = `
+          <div class="text-xs font-bold text-white mb-0.5">${escapeHtml(title)}</div>
+          <div class="text-[11px] text-slate-300 leading-snug">${escapeHtml(message)}</div>
+        `;
+        container.appendChild(el);
+        setTimeout(() => {
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(8px)';
+          setTimeout(() => el.remove(), 260);
+        }, 4200);
+      }
+
+      function copyToClipboardSafe(text, label = 'Text') {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          showToast(`${label} kopiert`, 'Erfolgreich in die Zwischenablage übernommen.', 'emerald');
+        } catch (_) {
+          showToast('Kopieren eingeschränkt', 'Bitte markiere den Inhalt direkt.', 'amber');
+        }
+        ta.remove();
+      }
+
+      function safeExternalUrl(rawUrl) {
+        try {
+          const parsed = new URL(String(rawUrl || '').trim());
+          if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            return parsed.href;
+          }
+        } catch (_) {}
+        return '#';
+      }
+
+      const STOPWORDS = new Set([
+        'der', 'die', 'das', 'den', 'dem', 'des', 'ein', 'eine', 'einer', 'einem', 'einen', 'und', 'oder',
+        'aber', 'auch', 'auf', 'aus', 'bei', 'mit', 'nach', 'seit', 'von', 'vor', 'zu', 'zum', 'zur',
+        'für', 'über', 'unter', 'durch', 'gegen', 'ohne', 'um', 'an', 'in', 'im', 'am', 'ist', 'sind',
+        'war', 'waren', 'wird', 'werden', 'wurde', 'wurden', 'hat', 'haben', 'hatte', 'kann', 'können',
+        'wie', 'was', 'wer', 'wo', 'wann', 'warum', 'welche', 'welcher', 'welches', 'erkläre',
+        'bitte', 'gib', 'mir', 'alle', 'thema', 'laut', 'datenbank', 'wissen', 'the', 'and', 'for',
+        'with', 'from', 'that', 'this', 'what', 'how', 'does', 'are', 'is', 'in', 'of', 'to', 'on'
+      ]);
+
+      function normalizeTerm(word) {
+        return word
+          .toLowerCase()
+          .replace(/ä/g, 'ae')
+          .replace(/ö/g, 'oe')
+          .replace(/ü/g, 'ue')
+          .replace(/ß/g, 'ss');
+      }
+
+      // Leichtgewichtiger deutsch/englischer Wortstamm-Reduzierer für hohe Trefferquote
+      function lightStem(normWord) {
+        if (normWord.length <= 4) return normWord;
+        return normWord.replace(/(ungen|ische|ischen|ischer|keit|heit|schaft|ieren|en|er|es|em|e|n|s)$/, '');
+      }
+
+      function tokenizeForSearch(text, filterStopwords = false) {
+        if (!text) return [];
+        const raw = String(text)
+          .toLowerCase()
+          .split(/[^a-z0-9äöüß_+#.-]+/i)
+          .map(t => t.replace(/^[.-]+|[.-]+$/g, ''))
+          .filter(t => t.length >= 2);
+        if (!filterStopwords) return raw;
+        const filtered = raw.filter(t => !STOPWORDS.has(t));
+        return filtered.length > 0 ? filtered : raw;
+      }
+
+      // ===================================================================
+      // 3. SMART OVERLAPPING CHUNKER (700–950 ZEICHEN, 150 OVERLAP)
+      // ===================================================================
+      function smartChunkSection(text, sectionTitle = 'Abschnitt 1', targetMax = 860, minSplit = 520, overlap = 150) {
+        const cleaned = String(text || '')
+          .replace(/\r\n/g, '\n')
+          .replace(/[ \t]+/g, ' ')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+
+        if (!cleaned) return [];
+        if (cleaned.length <= targetMax) {
+          return [{ section: sectionTitle, text: cleaned }];
+        }
+
+        const chunks = [];
+        let start = 0;
+        const total = cleaned.length;
+
+        while (start < total) {
+          let end = Math.min(total, start + targetMax);
+          if (end < total) {
+            const windowSlice = cleaned.slice(start + minSplit, end);
+            let bestRel = -1;
+            // Bevorzuge Absatzende -> Satzende -> Semikolon -> Wortgrenze
+            const paraBreak = windowSlice.lastIndexOf('\n\n');
+            if (paraBreak !== -1) {
+              bestRel = paraBreak + 2;
+            } else {
+              const sentMatch = Math.max(
+                windowSlice.lastIndexOf('. '),
+                windowSlice.lastIndexOf('! '),
+                windowSlice.lastIndexOf('? '),
+                windowSlice.lastIndexOf('.\n')
+              );
+              if (sentMatch !== -1) {
+                bestRel = sentMatch + 2;
+              } else {
+                const spaceIdx = windowSlice.lastIndexOf(' ');
+                if (spaceIdx !== -1) bestRel = spaceIdx + 1;
+              }
+            }
+            if (bestRel > 0) {
+              end = start + minSplit + bestRel;
+            }
+          }
+
+          const piece = cleaned.slice(start, end).trim();
+          if (piece.length > 0) {
+            chunks.push({ section: sectionTitle, text: piece });
+          }
+
+          if (end >= total) break;
+
+          // 150 Zeichen Overlap an sauberer Wort-/Satzgrenze ausrichten
+          let nextStart = Math.max(start + 120, end - overlap);
+          const nextSpace = cleaned.indexOf(' ', nextStart);
+          if (nextSpace !== -1 && nextSpace - nextStart < 45) {
+            nextStart = nextSpace + 1;
+          }
+          start = nextStart;
+        }
+
+        return chunks;
+      }
+
+      /**
+       * Zerlegt Markdown- oder Textdateien entlang von Überschriften (#, ##, ###)
+       * und wendet anschließend den Smart Overlapping Chunker an.
+       */
+      function parseAndChunkMarkdownOrText(rawText, defaultSection = 'Textkörper') {
+        const lines = String(rawText || '').replace(/\r\n/g, '\n').split('\n');
+        const sections = [];
+        let currentHeading = defaultSection;
+        let buffer = [];
+
+        for (const line of lines) {
+          const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
+          if (headingMatch) {
+            if (buffer.join('\n').trim().length > 0) {
+              sections.push({ heading: currentHeading, content: buffer.join('\n') });
+              buffer = [];
+            }
+            currentHeading = headingMatch[2].trim().slice(0, 90);
+            buffer.push(line);
+          } else {
+            buffer.push(line);
+          }
+        }
+        if (buffer.join('\n').trim().length > 0) {
+          sections.push({ heading: currentHeading, content: buffer.join('\n') });
+        }
+
+        const outChunks = [];
+        for (const sec of sections) {
+          const sub = smartChunkSection(sec.content, sec.heading);
+          for (const c of sub) outChunks.push(c);
+        }
+        return outChunks;
+      }
+
+      // ===================================================================
+      // 4. CLIENTSEITIGE DATEI-PARSER (.PDF VIA PDF.JS & .EPUB VIA JSZIP)
+      // ===================================================================
+      async function extractPdfChunks(file, onProgress) {
+        if (!window.pdfjsLib) {
+          throw new Error('PDF.js Bibliothek konnte nicht vom CDN geladen werden.');
+        }
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const numPages = pdf.numPages;
+        const allChunks = [];
+
+        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+          if (onProgress) {
+            onProgress(`PDF Seite ${pageNum}/${numPages} extrahieren...`, Math.round((pageNum / numPages) * 85));
+          }
+          const page = await pdf.getPage(pageNum);
+          const content = await page.getTextContent();
+
+          // Rekonstruiere Zeilen anhand der Y-Transformationskoordinate
+          let lastY = null;
+          let pageText = '';
+          for (const item of content.items) {
+            if (!item.str) continue;
+            const y = item.transform ? item.transform[5] : 0;
+            if (lastY !== null && Math.abs(y - lastY) > 5) {
+              pageText += '\n';
+            } else if (pageText.length > 0 && !pageText.endsWith(' ') && !pageText.endsWith('\n')) {
+              pageText += ' ';
+            }
+            pageText += item.str;
+            lastY = y;
+          }
+
+          const cleanPage = pageText.replace(/-\n([a-zäöüß])/g, '$1').trim();
+          if (cleanPage.length > 0) {
+            const pageChunks = smartChunkSection(cleanPage, `S. ${pageNum}`);
+            for (const c of pageChunks) allChunks.push(c);
+          }
+          // Kurzes Yielding alle 8 Seiten für flüssige Fortschrittsanzeige
+          if (pageNum % 8 === 0) await new Promise(r => setTimeout(r, 0));
+        }
+
+        if (allChunks.length === 0) {
+          throw new Error('Keine Textebene in dieser PDF gefunden (evtl. reiner Bild-Scan ohne OCR).');
+        }
+        return allChunks;
+      }
+
+      function resolveRelativeZipPath(baseDir, relHref) {
+        const cleanHref = relHref.split('#')[0].split('?')[0];
+        const stack = baseDir ? baseDir.split('/').filter(Boolean) : [];
+        for (const part of cleanHref.split('/')) {
+          if (!part || part === '.') continue;
+          if (part === '..') stack.pop();
+          else stack.push(part);
+        }
+        return stack.join('/');
+      }
+
+      async function extractEpubChunks(file, onProgress) {
+        if (!window.JSZip) {
+          throw new Error('JSZip Bibliothek konnte nicht vom CDN geladen werden.');
+        }
+        const arrayBuffer = await file.arrayBuffer();
+        const zip = await window.JSZip.loadAsync(arrayBuffer);
+        const parser = new DOMParser();
+
+        // 1. META-INF/container.xml lesen
+        const containerFile = zip.file('META-INF/container.xml');
+        if (!containerFile) {
+          throw new Error('Ungültiges EPUB: META-INF/container.xml fehlt.');
+        }
+        const containerXml = await containerFile.async('string');
+        const containerDoc = parser.parseFromString(containerXml, 'application/xml');
+        const rootfiles = containerDoc.getElementsByTagNameNS('*', 'rootfile');
+        if (!rootfiles || rootfiles.length === 0) {
+          throw new Error('EPUB OPF-Rootfile nicht in container.xml gefunden.');
+        }
+        const opfPath = rootfiles[0].getAttribute('full-path');
+        const opfEntry = zip.file(opfPath) || zip.file(decodeURIComponent(opfPath));
+        if (!opfEntry) {
+          throw new Error(`OPF-Paketdatei (${opfPath}) nicht im EPUB-Archiv gefunden.`);
+        }
+
+        // 2. OPF Manifest & Spine in Lesereihenfolge auslesen
+        const lastSlash = opfPath.lastIndexOf('/');
+        const opfDir = lastSlash !== -1 ? opfPath.slice(0, lastSlash + 1) : '';
+        const opfXml = await opfEntry.async('string');
+        const opfDoc = parser.parseFromString(opfXml, 'application/xml');
+
+        const manifestMap = new Map();
+        const items = opfDoc.getElementsByTagNameNS('*', 'item');
+        for (let i = 0; i < items.length; i++) {
+          const id = items[i].getAttribute('id');
+          const href = items[i].getAttribute('href');
+          const mediaType = items[i].getAttribute('media-type') || '';
+          if (id && href) manifestMap.set(id, { href, mediaType });
+        }
+
+        const itemrefs = opfDoc.getElementsByTagNameNS('*', 'itemref');
+        const spineHrefs = [];
+        for (let i = 0; i < itemrefs.length; i++) {
+          const idref = itemrefs[i].getAttribute('idref');
+          const item = manifestMap.get(idref);
+          if (item && (item.mediaType.includes('html') || item.mediaType.includes('xml') || /\.(x?html?|xml)$/i.test(item.href))) {
+            spineHrefs.push(item.href);
+          }
+        }
+
+        // Fallback für nicht-standardkonforme EPUB-Archive ohne auflösbare Spine-Einträge
+        if (spineHrefs.length === 0) {
+          Object.keys(zip.files)
+            .filter(name => /\.(x?html|htm)$/i.test(name) && !/toc|nav/i.test(name))
+            .sort()
+            .forEach(name => spineHrefs.push(name));
+        }
+
+        // 3. Kapitel parsen und bereinigen
+        const allChunks = [];
+        for (let idx = 0; idx < spineHrefs.length; idx++) {
+          if (onProgress) {
+            onProgress(`EPUB Kapitel ${idx + 1}/${spineHrefs.length} parsen...`, Math.round(((idx + 1) / spineHrefs.length) * 85));
+          }
+          const resolved = resolveRelativeZipPath(opfDir, spineHrefs[idx]);
+          const chFile = zip.file(resolved) || zip.file(decodeURIComponent(resolved));
+          if (!chFile) continue;
+
+          const rawHtml = await chFile.async('string');
+          const htmlDoc = parser.parseFromString(rawHtml, 'text/html');
+
+          // Störende Nicht-Text-Elemente entfernen
+          htmlDoc.querySelectorAll('script, style, svg, nav, noscript').forEach(n => n.remove());
+
+          const headingNode = htmlDoc.querySelector('h1, h2, h3, title');
+          let chapterTitle = headingNode && headingNode.textContent.trim()
+            ? headingNode.textContent.trim().replace(/\s+/g, ' ').slice(0, 75)
+            : `Kapitel ${idx + 1}`;
+
+          // Block-Absätze strukturiert auslesen
+          const blocks = htmlDoc.querySelectorAll('h1, h2, h3, h4, p, li, blockquote, pre');
+          let chapterText = '';
+          if (blocks.length > 0) {
+            const parts = [];
+            blocks.forEach(b => {
+              const t = b.textContent.replace(/\s+/g, ' ').trim();
+              if (t.length > 0) parts.push(t);
+            });
+            chapterText = parts.join('\n\n');
+          } else if (htmlDoc.body) {
+            chapterText = htmlDoc.body.textContent.replace(/\s+/g, ' ').trim();
+          }
+
+          if (chapterText.length >= 25) {
+            const chChunks = smartChunkSection(chapterText, chapterTitle);
+            for (const c of chChunks) allChunks.push(c);
+          }
+        }
+
+        if (allChunks.length === 0) {
+          throw new Error('Aus dieser EPUB-Datei konnten keine Textkapitel extrahiert werden.');
+        }
+        return allChunks;
+      }
+
+      // ===================================================================
+      // 5. ADAMIND 2048-BIT SDR ENCODER + BM25+ HYBRID RETRIEVAL ENGINE
+      // ===================================================================
+      const _sdrScratch = new Float32Array(SDR_DIM);
+
+      function hashMix32(str, seed) {
+        let h = (0x811c9dc5 ^ seed) >>> 0;
+        for (let i = 0; i < str.length; i++) {
+          h ^= str.charCodeAt(i);
+          h = Math.imul(h, 0x01000193);
+        }
+        h ^= h >>> 16;
+        h = Math.imul(h, 0x85ebca6b);
+        h ^= h >>> 13;
+        h = Math.imul(h, 0xc2b2ae35);
+        h ^= h >>> 16;
+        return h >>> 0;
+      }
+
+      /**
+       * Erzeugt deterministisch einen 2048-Bit Sparse Distributed Representation Vektor
+       * (Uint16Array mit exakt k=41 aktiven Minikolumnen) über Stammwörter & Trigramme.
+       */
+      function encodeToSDR(text, sectionTitle = '') {
+        _sdrScratch.fill(0);
+        const tokens = tokenizeForSearch((sectionTitle ? sectionTitle + ' ' : '') + text, true);
+
+        const project = (feat, weight, reps) => {
+          for (let r = 0; r < reps; r++) {
+            const col = hashMix32(feat, r * 0x9e3779b9) & 2047;
+            _sdrScratch[col] += weight;
+          }
+        };
+
+        const limit = Math.min(tokens.length, 180);
+        for (let i = 0; i < limit; i++) {
+          const norm = normalizeTerm(tokens[i]);
+          const stem = lightStem(norm);
+          const boost = i < 8 ? 3.4 : 2.1;
+          project('S:' + stem, boost, 4);
+
+          if (i + 1 < limit) {
+            const nextStem = lightStem(normalizeTerm(tokens[i + 1]));
+            project('B:' + stem + '_' + nextStem, 1.45, 2);
+          }
+
+          // Fehlertolerante 3-Gramm Zeichen-Shingles (fängt Tippfehler & Komposita ab)
+          if (norm.length >= 3) {
+            const padded = '^' + norm + '$';
+            for (let c = 0; c <= padded.length - 3; c++) {
+              project('G:' + padded.slice(c, c + 3), 0.52, 2);
+            }
+          }
+        }
+
+        // Fallback für extrem kurze Eingaben
+        if (limit === 0 && text) {
+          for (let r = 0; r < ACTIVE_K; r++) {
+            _sdrScratch[hashMix32(String(text), r * 2654435761) & 2047] += 0.2;
+          }
+        }
+
+        // k-Winner-Take-All (GABAerge laterale Hemmung -> 41 aktive Bits)
+        const active = [];
+        for (let i = 0; i < SDR_DIM; i++) {
+          if (_sdrScratch[i] > 0) active.push({ i, v: _sdrScratch[i] + i * 1e-7 });
+        }
+        active.sort((a, b) => b.v - a.v);
+        const count = Math.min(ACTIVE_K, active.length);
+        const sdr = new Uint16Array(count);
+        for (let j = 0; j < count; j++) sdr[j] = active[j].i;
+        sdr.sort();
+        return sdr;
+      }
+
+      function splitErrorSDR(querySdr, targetSdr) {
+        const onArr = [];
+        const offArr = [];
+        const matchArr = [];
+        let i = 0, j = 0;
+        while (i < querySdr.length && j < targetSdr.length) {
+          const q = querySdr[i], t = targetSdr[j];
+          if (q === t) { matchArr.push(q); i++; j++; }
+          else if (q < t) { onArr.push(q); i++; }
+          else { offArr.push(t); j++; }
+        }
+        while (i < querySdr.length) onArr.push(querySdr[i++]);
+        while (j < targetSdr.length) offArr.push(targetSdr[j++]);
+        const denom = Math.max(1, querySdr.length + targetSdr.length);
+        return {
+          matched: new Uint16Array(matchArr),
+          onError: new Uint16Array(onArr),
+          offError: new Uint16Array(offArr),
+          errorMag: (onArr.length + offArr.length) / denom
+        };
+      }
+
+      /**
+       * ISOLATED BRIDGE v1.1 (64-Byte Cacheline Header + Dual CRC32 Telemetrie)
+       */
+      class IsolatedBridgeWire {
+        constructor() {
+          this.seqId = 0;
+          this.lastBuffer = new ArrayBuffer(HEADER_SIZE);
+          this.lastHdrCrc = 0;
+          this.lastPayCrc = 0;
+        }
+
+        emitFrame(msgType, sdr, arousal, valence, freeEnergy) {
+          this.seqId++;
+          const activeCount = sdr ? sdr.length : 0;
+          const payloadBytes = activeCount * 4;
+          const buf = new ArrayBuffer(HEADER_SIZE + payloadBytes);
+          const dv = new DataView(buf);
+          const u8 = new Uint8Array(buf);
+
+          for (let i = 0; i < activeCount; i++) {
+            dv.setUint32(HEADER_SIZE + i * 4, sdr[i], true);
+          }
+          const payCrc = crc32(u8.subarray(HEADER_SIZE));
+
+          u8[0] = MAGIC_ADAM[0]; u8[1] = MAGIC_ADAM[1]; u8[2] = MAGIC_ADAM[2]; u8[3] = MAGIC_ADAM[3];
+          dv.setUint16(4, BRIDGE_VERSION, true);
+          dv.setUint16(6, msgType, true);
+          dv.setBigUint64(8, BigInt(this.seqId), true);
+          dv.setBigUint64(16, BigInt(Math.floor(performance.now() * 1e6)), true);
+          dv.setUint32(24, payloadBytes, true);
+          dv.setUint32(28, payCrc, true);
+          dv.setUint32(32, SDR_DIM, true);
+          dv.setUint32(36, activeCount, true);
+          dv.setFloat32(40, arousal, true);
+          dv.setFloat32(44, valence, true);
+          dv.setFloat32(48, freeEnergy, true);
+          dv.setUint16(52, 0x0001, true);
+
+          const hdrCrc = crc32(u8.subarray(0, 60));
+          dv.setUint32(60, hdrCrc, true);
+
+          this.lastBuffer = buf;
+          this.lastHdrCrc = hdrCrc;
+          this.lastPayCrc = payCrc;
+        }
+
+        zeroWipe() {
+          new Uint8Array(this.lastBuffer).fill(0);
+          this.seqId = 0;
+          this.lastHdrCrc = 0;
+          this.lastPayCrc = 0;
+        }
+      }
+
+      /**
+       * HYBRIDE CORTEX-ENGINE:
+       * Vereint den TypedArray-basierten 2048-Bit SDR-Index + BM25+ Invertierten Index
+       * + Limbic Salience Reranker + WorkingMemory (7 Slots) + NREM/REM Schlafzyklus.
+       */
+      class HybridNeuroDatabase {
+        constructor(initialCap = 4096) {
+          this.capacity = initialCap;
+          this.chunkCount = 0;
+          this.activeChunkCount = 0;
+          this.enabledChunkCount = 0;
+          this.totalTokensSum = 0;
+          this.enabledTokensSum = 0;
+
+          // Dokumente: Map<docId, { id, name, format, enabled, chunkIds[], charCount, createdAt }>
+          this.documents = new Map();
+          this.chunks = [];
+
+          // 1. 2048-Bit SDR Invertierter Bit-Index (TypedArrays)
+          this.sdrPostings = new Array(SDR_DIM);
+          this.sdrLengths = new Uint32Array(SDR_DIM);
+          for (let c = 0; c < SDR_DIM; c++) this.sdrPostings[c] = new Int32Array(32);
+
+          // 2. BM25+ Lexikalischer Invertierter Index: term -> Array<number> (gepackt: chunkId, tf)
+          this.bm25Index = new Map();
+
+          // Chunk-Vektoren & Synapsengewichte
+          this.aliveFlags = new Uint8Array(initialCap);
+          this.docEnabledFlags = new Uint8Array(initialCap);
+          this.chunkTokenLengths = new Uint16Array(initialCap);
+          this.ltpWeights = new Float32Array(initialCap);
+
+          // Zero-Allocation Scratchpads für < 1ms Abfragen
+          this.sdrOverlapScratch = new Uint16Array(initialCap);
+          this.bm25ScoreScratch = new Float32Array(initialCap);
+          this.candidateVisited = new Uint8Array(initialCap);
+          this.candidateList = new Int32Array(initialCap);
+
+          // Kognitive Telemetrie & Arbeitsgedächtnis
+          this.bridge = new IsolatedBridgeWire();
+          this.modulators = { ach: 0.52, da: 0.40, arousal: 0.25, valence: 0.25 };
+          this.freeEnergy = 0.034;
+          this.lastLatencyMs = 0.28;
+          this.workingMemory = []; // max 7 { chunkId, title, activation }
+          this.lastSplit = {
+            sensory: new Uint16Array(0),
+            matched: new Uint16Array(0),
+            onError: new Uint16Array(0),
+            offError: new Uint16Array(0)
+          };
+        }
+
+        _ensureCap(needed) {
+          if (needed <= this.capacity) return;
+          const next = Math.max(needed, this.capacity * 2);
+          const growU8 = old => { const n = new Uint8Array(next); n.set(old); return n; };
+          const growU16 = old => { const n = new Uint16Array(next); n.set(old); return n; };
+          const growF32 = old => { const n = new Float32Array(next); n.set(old); return n; };
+
+          this.aliveFlags = growU8(this.aliveFlags);
+          this.docEnabledFlags = growU8(this.docEnabledFlags);
+          this.chunkTokenLengths = growU16(this.chunkTokenLengths);
+          this.ltpWeights = growF32(this.ltpWeights);
+          this.sdrOverlapScratch = new Uint16Array(next);
+          this.bm25ScoreScratch = new Float32Array(next);
+          this.candidateVisited = new Uint8Array(next);
+          this.candidateList = new Int32Array(next);
+          this.capacity = next;
+        }
+
+        ingestDocument(docMeta, rawChunks) {
+          const docId = docMeta.id || ('doc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+          const enabled = docMeta.enabled !== false;
+          const docRecord = {
+            id: docId,
+            name: docMeta.name,
+            format: (docMeta.format || 'TXT').toUpperCase(),
+            enabled,
+            chunkIds: [],
+            charCount: 0,
+            createdAt: docMeta.createdAt || Date.now()
+          };
+
+          for (let idx = 0; idx < rawChunks.length; idx++) {
+            const rc = rawChunks[idx];
+            const chunkId = this.chunkCount;
+            this._ensureCap(chunkId + 1);
+
+            const sdr = rc.sdr instanceof Uint16Array ? rc.sdr : encodeToSDR(rc.text, rc.section);
+            const tokens = tokenizeForSearch((rc.section || '') + ' ' + rc.text, false);
+            const tokLen = Math.min(65535, tokens.length);
+
+            this.aliveFlags[chunkId] = 1;
+            this.docEnabledFlags[chunkId] = enabled ? 1 : 0;
+            this.chunkTokenLengths[chunkId] = tokLen;
+            this.ltpWeights[chunkId] = typeof rc.ltp === 'number' && Number.isFinite(rc.ltp) ? rc.ltp : 1.0;
+
+            // SDR Bit-Postings eintragen
+            for (let b = 0; b < sdr.length; b++) {
+              const col = sdr[b];
+              let buf = this.sdrPostings[col];
+              const len = this.sdrLengths[col];
+              if (len >= buf.length) {
+                const nextBuf = new Int32Array(buf.length * 2);
+                nextBuf.set(buf);
+                buf = nextBuf;
+                this.sdrPostings[col] = buf;
+              }
+              buf[len] = chunkId;
+              this.sdrLengths[col] = len + 1;
+            }
+
+            // BM25+ Term-Frequenzen (Exakte Normalform + Stammform) eintragen
+            const tfMap = new Map();
+            for (let t = 0; t < tokens.length; t++) {
+              const norm = normalizeTerm(tokens[t]);
+              tfMap.set(norm, (tfMap.get(norm) || 0) + 1);
+              const stem = lightStem(norm);
+              if (stem !== norm && stem.length >= 3) {
+                const stemKey = '~' + stem;
+                tfMap.set(stemKey, (tfMap.get(stemKey) || 0) + 1);
+              }
+            }
+            for (const [term, tf] of tfMap.entries()) {
+              let plist = this.bm25Index.get(term);
+              if (!plist) {
+                plist = [];
+                this.bm25Index.set(term, plist);
+              }
+              plist.push(chunkId, tf);
+            }
+
+            const chunkObj = {
+              id: chunkId,
+              docId,
+              docName: docRecord.name,
+              docFormat: docRecord.format,
+              section: rc.section || `Chunk ${idx + 1}`,
+              text: rc.text,
+              textLower: rc.text.toLowerCase(),
+              sdr
+            };
+            this.chunks.push(chunkObj);
+            docRecord.chunkIds.push(chunkId);
+            docRecord.charCount += rc.text.length;
+
+            this.chunkCount++;
+            this.activeChunkCount++;
+            this.totalTokensSum += tokLen;
+            if (enabled) {
+              this.enabledChunkCount++;
+              this.enabledTokensSum += tokLen;
+            }
+          }
+
+          this.documents.set(docId, docRecord);
+          return docRecord;
+        }
+
+        setDocumentEnabled(docId, enabled) {
+          const doc = this.documents.get(docId);
+          const nextState = Boolean(enabled);
+          if (!doc || doc.enabled === nextState) return;
+          doc.enabled = nextState;
+          const flag = nextState ? 1 : 0;
+          for (const cid of doc.chunkIds) {
+            if (this.aliveFlags[cid] === 1) {
+              this.docEnabledFlags[cid] = flag;
+              const tokLen = this.chunkTokenLengths[cid];
+              if (nextState) {
+                this.enabledChunkCount++;
+                this.enabledTokensSum += tokLen;
+              } else {
+                this.enabledChunkCount = Math.max(0, this.enabledChunkCount - 1);
+                this.enabledTokensSum = Math.max(0, this.enabledTokensSum - tokLen);
+              }
+            }
+          }
+        }
+
+        deleteDocument(docId) {
+          const doc = this.documents.get(docId);
+          if (!doc) return;
+          for (const cid of doc.chunkIds) {
+            if (this.aliveFlags[cid] === 1) {
+              const wasEnabled = this.docEnabledFlags[cid] === 1;
+              const tokLen = this.chunkTokenLengths[cid];
+              this.aliveFlags[cid] = 0;
+              this.docEnabledFlags[cid] = 0;
+              this.activeChunkCount = Math.max(0, this.activeChunkCount - 1);
+              this.totalTokensSum = Math.max(0, this.totalTokensSum - tokLen);
+              if (wasEnabled) {
+                this.enabledChunkCount = Math.max(0, this.enabledChunkCount - 1);
+                this.enabledTokensSum = Math.max(0, this.enabledTokensSum - tokLen);
+              }
+            }
+          }
+          this.workingMemory = this.workingMemory.filter(w => {
+            const c = this.chunks[w.chunkId];
+            return c && c.docId !== docId;
+          });
+          this.documents.delete(docId);
+        }
+
+        /**
+         * ULTRASCHNELLER HYBRID-ABRUF (< 1–2 ms):
+         * Kombiniert 2048-Bit SDR Overlap + BM25+ + Exakten Phrasen-/Abschnitts-Boost + ACh-Präzision.
+         */
+        searchHybrid(queryText, topK = 8, updateNeuroState = true) {
+          const t0 = performance.now();
+          const cleanQuery = String(queryText || '').trim();
+          if (!cleanQuery || this.enabledChunkCount === 0) {
+            return { results: [], latencyMs: 0, queryTerms: [] };
+          }
+
+          const querySdr = encodeToSDR(cleanQuery, '');
+          const rawTokens = tokenizeForSearch(cleanQuery, true);
+          const uniqueTerms = Array.from(new Set(rawTokens.map(normalizeTerm)));
+
+          let candCount = 0;
+          const visited = this.candidateVisited;
+          const candList = this.candidateList;
+          const sdrScratch = this.sdrOverlapScratch;
+          const bm25Scratch = this.bm25ScoreScratch;
+          const alive = this.aliveFlags;
+          const docEn = this.docEnabledFlags;
+
+          // A. 2048-Bit SDR Kortikaler Scan (nur 41 aktive Kolumnen traversieren!)
+          for (let i = 0; i < querySdr.length; i++) {
+            const col = querySdr[i];
+            const len = this.sdrLengths[col];
+            const buf = this.sdrPostings[col];
+            for (let p = 0; p < len; p++) {
+              const cid = buf[p];
+              if (alive[cid] === 1 && docEn[cid] === 1) {
+                if (visited[cid] === 0) {
+                  visited[cid] = 1;
+                  candList[candCount++] = cid;
+                }
+                sdrScratch[cid]++;
+              }
+            }
+          }
+
+          // B. BM25+ Lexikalischer Präzisions-Scan (k1 = 1.5, b = 0.75, delta = 1.0)
+          const N = Math.max(1, this.enabledChunkCount);
+          const avgDl = Math.max(10, this.enabledTokensSum / N);
+          const k1 = 1.5, b = 0.75, delta = 1.0;
+
+          const lookupKeys = [];
+          for (const term of uniqueTerms) {
+            lookupKeys.push({ key: term, weight: 1.0 });
+            const st = lightStem(term);
+            if (st !== term && st.length >= 3) {
+              lookupKeys.push({ key: '~' + st, weight: 0.62 });
+            }
+          }
+
+          for (const { key, weight } of lookupKeys) {
+            const plist = this.bm25Index.get(key);
+            if (!plist) continue;
+
+            // Zähle exakt die aktiven & eingeschalteten Chunks (verhindert activeDf > N -> Math.log(<0) NaN!)
+            let activeDf = 0;
+            for (let p = 0; p < plist.length; p += 2) {
+              const cid = plist[p];
+              if (alive[cid] === 1 && docEn[cid] === 1) activeDf++;
+            }
+            if (activeDf === 0) continue;
+
+            const safeDf = Math.min(N, activeDf);
+            const idf = Math.log(1 + (N - safeDf + 0.5) / (safeDf + 0.5));
+            for (let p = 0; p < plist.length; p += 2) {
+              const cid = plist[p];
+              if (alive[cid] !== 1 || docEn[cid] !== 1) continue;
+              const tf = plist[p + 1];
+              if (visited[cid] === 0) {
+                visited[cid] = 1;
+                candList[candCount++] = cid;
+              }
+              const dl = this.chunkTokenLengths[cid] || avgDl;
+              const tfNorm = ((tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (dl / avgDl)))) + delta;
+              bm25Scratch[cid] += weight * idf * tfNorm;
+            }
+          }
+
+          // Maximalen BM25-Wert für saubere [0..1] Normierung bestimmen
+          let maxBm25 = 0.001;
+          for (let i = 0; i < candCount; i++) {
+            const v = bm25Scratch[candList[i]];
+            if (v > maxBm25) maxBm25 = v;
+          }
+
+          // C. Limbic Salience & Acetylcholin-Präzisions-Reranking
+          const queryLower = cleanQuery.toLowerCase();
+          const hasMultiWordPhrase = rawTokens.length >= 2 && queryLower.length >= 6;
+          const bigrams = [];
+          for (let i = 0; i + 1 < rawTokens.length; i++) {
+            bigrams.push(rawTokens[i] + ' ' + rawTokens[i + 1]);
+          }
+
+          const scored = [];
+          const qBits = Math.max(1, querySdr.length);
+
+          for (let i = 0; i < candCount; i++) {
+            const cid = candList[i];
+            const ovBits = sdrScratch[cid];
+            const rawBm = bm25Scratch[cid];
+
+            // Sofortiges O(1) Zurücksetzen der Scratchpads für den nächsten Suchlauf
+            visited[cid] = 0;
+            sdrScratch[cid] = 0;
+            bm25Scratch[cid] = 0;
+
+            const sdrNorm = ovBits / qBits;
+            const bmNorm = rawBm > 0 ? (rawBm / maxBm25) : 0;
+
+            // Phrasen- und Überschriften-Präzisionsboost
+            const chunk = this.chunks[cid];
+            let phraseBoost = 0;
+            if (hasMultiWordPhrase && chunk.textLower.includes(queryLower)) {
+              phraseBoost += 0.22;
+            } else if (bigrams.length > 0) {
+              for (const bg of bigrams) {
+                if (chunk.textLower.includes(bg)) { phraseBoost += 0.08; break; }
+              }
+            }
+            const secLower = chunk.section.toLowerCase();
+            for (const rt of rawTokens) {
+              if (rt.length >= 3 && secLower.includes(rt)) {
+                phraseBoost += 0.07;
+                break;
+              }
+            }
+
+            // Kombinierte Neuro-RAG Relevanzformel
+            const ltpFactor = 0.92 + 0.08 * Math.min(1.6, this.ltpWeights[cid]);
+            const hybridScore = (bmNorm * 0.56 + sdrNorm * 0.34 + Math.min(0.28, phraseBoost)) * ltpFactor;
+
+            if (hybridScore >= 0.06 || ovBits >= 3 || rawBm > 0) {
+              scored.push({
+                chunk,
+                hybridScore,
+                bm25Score: rawBm,
+                bm25Norm: bmNorm,
+                overlapBits: ovBits,
+                overlapPct: Math.round(sdrNorm * 100)
+              });
+            }
+          }
+
+          scored.sort((a, b) => b.hybridScore - a.hybridScore || b.bm25Score - a.bm25Score);
+          const topResults = scored.slice(0, topK);
+          const latencyMs = Math.max(0.02, performance.now() - t0);
+          this.lastLatencyMs = latencyMs;
+
+          if (updateNeuroState) {
+            this._updateNeuroTelemetry(querySdr, topResults);
+          }
+
+          return { results: topResults, latencyMs, queryTerms: rawTokens };
+        }
+
+        _updateNeuroTelemetry(querySdr, topResults) {
+          const bestSdr = topResults.length > 0 ? topResults[0].chunk.sdr : new Uint16Array(0);
+          const sp = splitErrorSDR(querySdr, bestSdr);
+          this.lastSplit = {
+            sensory: querySdr,
+            matched: sp.matched,
+            onError: sp.onError,
+            offError: sp.offError
+          };
+
+          const topScore = topResults.length > 0 ? Math.min(1.0, topResults[0].hybridScore) : 0.0;
+          // Variational Free Energy sinkt bei starker Evidenz-Konvergenz
+          this.freeEnergy = Math.max(0.012, Math.min(0.95, (1.0 - topScore * 0.85) * 0.42 + sp.errorMag * 0.12));
+          this.modulators.ach = Math.min(0.98, 0.35 + sp.errorMag * 0.52);
+          this.modulators.da = Math.min(0.98, 0.22 + topScore * 0.68);
+          this.modulators.arousal = Math.min(0.95, 0.18 + sp.errorMag * 0.45);
+          this.modulators.valence = Math.max(-1.0, Math.min(1.0, (topScore - 0.35) * 1.1));
+
+          // Top-3 Treffer ins 7-Slot NMDA-Arbeitsgedächtnis einspeisen
+          for (const slot of this.workingMemory) slot.activation *= 0.84;
+          for (let i = 0; i < Math.min(3, topResults.length); i++) {
+            const c = topResults[i].chunk;
+            const existing = this.workingMemory.find(w => w.chunkId === c.id);
+            if (existing) {
+              existing.activation = Math.min(1.35, existing.activation + 0.42);
+            } else {
+              this.workingMemory.push({
+                chunkId: c.id,
+                title: `${c.docName.slice(0, 18)} (${c.section})`,
+                activation: 0.95 - i * 0.12
+              });
+            }
+          }
+          this.workingMemory = this.workingMemory
+            .filter(w => w.activation >= 0.22)
+            .sort((a, b) => b.activation - a.activation)
+            .slice(0, 7);
+
+          this.bridge.emitFrame(0x0001, querySdr, this.modulators.arousal, this.modulators.valence, this.freeEnergy);
+        }
+
+        runSleepCycle() {
+          let boosted = 0;
+          for (const wm of this.workingMemory) {
+            if (this.aliveFlags[wm.chunkId] === 1) {
+              this.ltpWeights[wm.chunkId] = Math.min(1.6, this.ltpWeights[wm.chunkId] + 0.18);
+              boosted++;
+            }
+          }
+          // Tononi-Cirelli Synaptic Homeostasis Downscaling (x0.92 Richtung 1.0 Baseline)
+          for (let i = 0; i < this.chunkCount; i++) {
+            if (this.aliveFlags[i] === 1) {
+              this.ltpWeights[i] = 1.0 + (this.ltpWeights[i] - 1.0) * 0.92;
+            }
+          }
+          this.modulators.arousal = 0.14;
+          this.freeEnergy = 0.019;
+          this.bridge.emitFrame(0x0006, this.lastSplit.sensory, this.modulators.arousal, this.modulators.valence, this.freeEnergy);
+          return { boosted, activeChunks: this.activeChunkCount };
+        }
+
+        zeroWipeAll() {
+          for (let c = 0; c < SDR_DIM; c++) this.sdrPostings[c].fill(0);
+          this.sdrLengths.fill(0);
+          this.bm25Index.clear();
+          this.aliveFlags.fill(0);
+          this.docEnabledFlags.fill(0);
+          this.chunkTokenLengths.fill(0);
+          this.ltpWeights.fill(0);
+          for (const ch of this.chunks) {
+            if (ch && ch.sdr) ch.sdr.fill(0);
+          }
+          this.chunks = [];
+          this.documents.clear();
+          this.chunkCount = 0;
+          this.activeChunkCount = 0;
+          this.enabledChunkCount = 0;
+          this.totalTokensSum = 0;
+          this.enabledTokensSum = 0;
+          this.workingMemory = [];
+          this.lastSplit = {
+            sensory: new Uint16Array(0),
+            matched: new Uint16Array(0),
+            onError: new Uint16Array(0),
+            offError: new Uint16Array(0)
+          };
+          this.freeEnergy = 0.0;
+          this.bridge.zeroWipe();
+        }
+      }
+
+      // ===================================================================
+      // 6. INDEXEDDB PERSISTENZ-ENGINE (WAHLWEISE PERSISTENT ODER RAM-ONLY)
+      // ===================================================================
+      const IDB_NAME = 'AdaMindCortexDB_v020';
+      const IDB_VERSION = 2;
+      const IDB_STORE = 'documents_store';
+      const IDB_SETTINGS_STORE = 'settings_store';
+      let isSyncingDatabase = false;
+
+      function openCortexIDB() {
+        return new Promise((resolve, reject) => {
+          if (!window.indexedDB) return reject(new Error('IndexedDB nicht verfügbar'));
+          const req = window.indexedDB.open(IDB_NAME, IDB_VERSION);
+          req.onupgradeneeded = (e) => {
+            const idb = e.target.result;
+            if (!idb.objectStoreNames.contains(IDB_STORE)) {
+              idb.createObjectStore(IDB_STORE, { keyPath: 'id' });
+            }
+            if (!idb.objectStoreNames.contains(IDB_SETTINGS_STORE)) {
+              idb.createObjectStore(IDB_SETTINGS_STORE, { keyPath: 'id' });
+            }
+          };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      function awaitIdbTransaction(tx) {
+        return new Promise((resolve, reject) => {
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+          tx.onabort = () => reject(tx.error || new Error('IndexedDB Transaktion abgebrochen'));
+        });
+      }
+
+      async function idbSaveAiSettings() {
+        if (!appState.persistIndexedDB || !appState.aiConfig.rememberKeys) return;
+        let idb = null;
+        try {
+          idb = await openCortexIDB();
+          const tx = idb.transaction(IDB_SETTINGS_STORE, 'readwrite');
+          tx.objectStore(IDB_SETTINGS_STORE).put({
+            id: 'ai_settings',
+            activeProvider: appState.activeProvider,
+            aiConfig: { ...appState.aiConfig }
+          });
+          await awaitIdbTransaction(tx);
+        } catch (_) {} finally {
+          if (idb) idb.close();
+        }
+      }
+
+      async function idbDeleteAiSettings() {
+        let idb = null;
+        try {
+          idb = await openCortexIDB();
+          const tx = idb.transaction(IDB_SETTINGS_STORE, 'readwrite');
+          tx.objectStore(IDB_SETTINGS_STORE).delete('ai_settings');
+          await awaitIdbTransaction(tx);
+        } catch (_) {} finally {
+          if (idb) idb.close();
+        }
+      }
+
+      async function idbLoadAiSettings() {
+        let idb = null;
+        try {
+          idb = await openCortexIDB();
+          return await new Promise((resolve) => {
+            const tx = idb.transaction(IDB_SETTINGS_STORE, 'readonly');
+            const req = tx.objectStore(IDB_SETTINGS_STORE).get('ai_settings');
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+          });
+        } catch (_) {
+          return null;
+        } finally {
+          if (idb) idb.close();
+        }
+      }
+
+      async function idbSaveDocument(docRecord, chunkObjects) {
+        if (!appState.persistIndexedDB) return;
+        let idb = null;
+        try {
+          idb = await openCortexIDB();
+          const tx = idb.transaction(IDB_STORE, 'readwrite');
+          tx.objectStore(IDB_STORE).put({
+            id: docRecord.id,
+            name: docRecord.name,
+            format: docRecord.format,
+            enabled: docRecord.enabled,
+            createdAt: docRecord.createdAt,
+            chunks: chunkObjects.map(c => ({
+              section: c.section,
+              text: c.text,
+              ltp: typeof c.ltp === 'number' && Number.isFinite(c.ltp) ? c.ltp : 1.0
+            }))
+          });
+          await awaitIdbTransaction(tx);
+        } catch (_) { /* Fallback im Private-Browsing ohne Fehlerabbruch */ } finally {
+          if (idb) idb.close();
+        }
+      }
+
+      async function idbDeleteDocument(docId) {
+        let idb = null;
+        try {
+          idb = await openCortexIDB();
+          const tx = idb.transaction(IDB_STORE, 'readwrite');
+          tx.objectStore(IDB_STORE).delete(docId);
+          await awaitIdbTransaction(tx);
+        } catch (_) {} finally {
+          if (idb) idb.close();
+        }
+      }
+
+      async function idbLoadAllDocuments() {
+        let idb = null;
+        try {
+          idb = await openCortexIDB();
+          return await new Promise((resolve, reject) => {
+            const tx = idb.transaction(IDB_STORE, 'readonly');
+            const req = tx.objectStore(IDB_STORE).getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+          });
+        } catch (_) {
+          return [];
+        } finally {
+          if (idb) idb.close();
+        }
+      }
+
+      async function idbClearAll() {
+        let idb = null;
+        try {
+          idb = await openCortexIDB();
+          const tx = idb.transaction([IDB_STORE, IDB_SETTINGS_STORE], 'readwrite');
+          tx.objectStore(IDB_STORE).clear();
+          tx.objectStore(IDB_SETTINGS_STORE).clear();
+          await awaitIdbTransaction(tx);
+        } catch (_) {} finally {
+          if (idb) idb.close();
+        }
+      }
+
+      /**
+       * Atomare Komplettsicherung aller aktiven Dokumente, Filter-Zustände und
+       * synaptischen LTP-Gewichtungen in IndexedDB (für das 60-Sekunden-Auto-Save).
+       */
+      async function idbSyncFullDatabase() {
+        if (!appState.persistIndexedDB || isSyncingDatabase) {
+          return { savedDocs: 0, skipped: true };
+        }
+        isSyncingDatabase = true;
+        let idbConn = null;
+        try {
+          idbConn = await openCortexIDB();
+          const snapshotDocs = [];
+          for (const doc of db.documents.values()) {
+            snapshotDocs.push({
+              id: doc.id,
+              name: doc.name,
+              format: doc.format,
+              enabled: doc.enabled,
+              createdAt: doc.createdAt,
+              chunks: doc.chunkIds.map(cid => ({
+                section: db.chunks[cid].section,
+                text: db.chunks[cid].text,
+                ltp: Number(db.ltpWeights[cid].toFixed(4))
+              }))
+            });
+          }
+
+          const tx = idbConn.transaction(IDB_STORE, 'readwrite');
+          const store = tx.objectStore(IDB_STORE);
+          store.clear();
+          for (const item of snapshotDocs) {
+            store.put(item);
+          }
+          await awaitIdbTransaction(tx);
+
+          appState.lastAutoSaveTime = new Date().toLocaleTimeString('de-DE');
+          appState.autoSaveRemainingSec = 60;
+          return { savedDocs: snapshotDocs.length, skipped: false };
+        } catch (_) {
+          return { savedDocs: 0, skipped: true };
+        } finally {
+          if (idbConn) idbConn.close();
+          isSyncingDatabase = false;
+        }
+      }
+
+      // ===================================================================
+      // 7. VORINSTALLIERTE DEMO-WISSENSBASIS (3 FACHDOKUMENTE)
+      // ===================================================================
+      const DEMO_DOCUMENTS = [
+        {
+          id: 'demo_adamind_spec',
+          name: 'AdaMind_Sprachspezifikation_v0.2.md',
+          format: 'MD',
+          chunks: parseAndChunkMarkdownOrText(
+`# AdaMind (v0.2) — Kognitive Beschreibungssprache für den Neokortex
+AdaMind (.adm) ersetzt imperative Von-Neumann-Kontrollflüsse durch kanonische kortikale Mikroschaltkreise (Laminae I bis VI) und Sparse Distributed Representations (SDR) mit exakt 2048 Bit Dimensionalität und k=41 aktiven Minikolumnen (2 % Sparsity). Durch diese dünne Besetzung liegt die zufällige Bit-Kollision zweier unabhängiger Konzepte unter 1 Bit, was extrem schnelle assoziative Abfragen im Mikrosekundenbereich ermöglicht.
+
+## Split-Channel Vorhersagefehler & Free-Energy-Konvergenz
+Statt statischer Return-Werte minimiert die AdaMind-Laufzeitumgebung kontinuierlich die Variational Free Energy (F). Lamina V/VI projiziert generative Top-Down-Erwartungen (Priors) auf Lamina IV. Dort wird der Fehler in zwei biologisch getrennte Kanäle zerlegt: On-Error (Sensory ohne Prior, unerwartetes Reizsignal) und Off-Error (Prior ohne Sensory, ausgelassene Erwartung / Omission Response). Nur ungelöste Residuen steigen über Lamina II/III auf.
+
+## Limbisches Salienz-Gating & Neuromodulation
+Emotionen fungieren in AdaMind als globale Steuersignale: Dopamin kodiert den Temporal-Difference Reward Prediction Error (delta = R_obs + gamma * V(s') - V(s)) und öffnet D1-Rezeptoren des direkten Basalganglien-Pfads (Go). Acetylcholin (Nucleus basalis Meynert) steigt proportional zum Vorhersagefehler und erhöht die Präzisionsgewichtung (Precision Pi) sensorischer Bottom-Up-Daten gegenüber veralteten Priors.`
+          )
+        },
+        {
+          id: 'demo_neuro_sleep',
+          name: 'Neokortex_Predictive_Coding_und_Schlaf.pdf',
+          format: 'PDF',
+          chunks: [
+            {
+              section: 'S. 1',
+              text: 'Predictive Processing nach Karl Friston beschreibt das Großhirn als hierarchische bayesianische Inferenzmaschine. Wahrnehmung und Handeln (Active Inference) verfolgen dasselbe Ziel: die Minimierung freier Energie. Während Wahrnehmung das interne Weltmodell an sensorische Überraschungen anpasst, verändert Verhalten aktiv die Umwelt, sodass sensorische Eingänge den Vorhersagen entsprechen.'
+            },
+            {
+              section: 'S. 2',
+              text: 'Arbeitsgedächtnis und NMDA-Rezeptorkinetik: Im dorsolateralen präfrontalen Kortex (Lamina III) werden bis zu 7 Informations-Chunks nicht passiv in Adressregistern abgelegt, sondern durch rekurrente exzitatorische Schleifen (Persistent Firing) über langsam deaktivierende NMDA-Glutamatrezeptoren aktiv gehalten. Ohne Aufmerksamkeit oder Re-Entry klingt das Signal exponentiell unter die SNR-Schwelle von 0.20 ab.'
+            },
+            {
+              section: 'S. 3',
+              text: 'Zwei-Phasen-Schlafkonsolidierung (NREM und REM): Im NREM-Tiefschlaf übertragen hippocampale Sharp-Wave Ripples tagsüber als salient markierte Episoden in die langsame neokortikale Gewichtsmatrix. Gleichzeitig skaliert Synaptic Homeostasis (SHY nach Tononi & Cirelli, Faktor x0.94) alle Synapsen herab, um Sättigung zu verhindern. Im REM-Schlaf werden unter minimalem Noradrenalin entfernte Konzepte kreativ rekombiniert und somatische Alarmspitzen (Arousal) depotenziert.'
+            }
+          ]
+        },
+        {
+          id: 'demo_sandbox_security',
+          name: 'CerebralEnclave_IsolatedBridge_Sicherheit.txt',
+          format: 'TXT',
+          chunks: [
+            {
+              section: 'Abschnitt 1: Blut-Hirn-Schranke',
+              text: 'Die CerebralEnclave trennt inhaltsagnostische Vektoralgebra (Layer 1 bis 3) strikt vom Host-Betriebssystem. Layer 3 schützt das Netzwerk rein physiologisch vor epileptiformer Übererregung (Status epilepticus): Überschreitet ein Eingangsvektor 15 % aktive Bits, erzwingt ein GABAerger k-Winner-Take-All Depolarisationsblock sofort die Rückführung auf 2 % Sparsity (41 aktive Kolumnen).'
+            },
+            {
+              section: 'Abschnitt 2: 64-Byte Wire-Protokoll',
+              text: 'Das IsolatedBridge v1.1 Protokoll nutzt einen 64-Byte Cacheline-ausgerichteten Binärheader mit den ASCII-Magic-Bytes ADAM (0x41 0x44 0x41 0x4D), Protokollversion 0x0101 und dualer CRC32-Prüfsumme. Um Time-of-Check-to-Time-of-Use (TOCTOU / Double-Fetch) Angriffe im Shared Memory auszuschließen, kopiert der Empfänger den Frame vor der Header-CRC32-Prüfung vollständig in einen privaten Puffer. Beim Beenden überschreibt VolatileVault alle Puffer deterministisch mit 0x00.'
+            }
+          ]
+        }
+      ];
+
+      // ===================================================================
+      // 8. LIVE ONLINE-RECHERCHE (WIKIPEDIA DE/EN, DUCKDUCKGO, CROSSREF, JINA URL)
+      // ===================================================================
+      async function fetchWithTimeout(url, options = {}, timeoutMs = 5500) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+        try {
+          const resp = await fetch(url, { ...options, signal: ctrl.signal });
+          return resp;
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      async function fetchUrlViaJinaReader(targetUrl) {
+        const cleanUrl = targetUrl.trim();
+        const readerUrl = 'https://r.jina.ai/' + cleanUrl;
+        const resp = await fetchWithTimeout(readerUrl, {
+          headers: { 'Accept': 'text/plain' }
+        }, 12000);
+        if (!resp.ok) {
+          throw new Error(`URL-Abruf fehlgeschlagen (HTTP ${resp.status})`);
+        }
+        const text = await resp.text();
+        if (!text || text.trim().length < 30) {
+          throw new Error('Die abgerufene Webseite lieferte keinen auswertbaren Textinhalt.');
+        }
+        return text;
+      }
+
+      async function searchWikipediaLang(searchQuery, lang = 'de', limit = 2) {
+        const q = encodeURIComponent(searchQuery);
+        const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${q}&utf8=1&format=json&origin=*&srlimit=${limit}`;
+        const sResp = await fetchWithTimeout(searchUrl, {}, 4500);
+        if (!sResp.ok) return [];
+        const sJson = await sResp.json();
+        const hits = sJson?.query?.search || [];
+        if (hits.length === 0) return [];
+
+        const titles = hits.map(h => h.title).join('|');
+        const extUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&titles=${encodeURIComponent(titles)}&format=json&origin=*`;
+        const eResp = await fetchWithTimeout(extUrl, {}, 4500);
+        if (!eResp.ok) return [];
+        const eJson = await eResp.json();
+        const pages = eJson?.query?.pages || {};
+
+        const results = [];
+        for (const pid of Object.keys(pages)) {
+          const p = pages[pid];
+          if (p && p.extract && p.extract.trim().length > 40) {
+            results.push({
+              sourceType: 'web',
+              provider: `Wikipedia (${lang.toUpperCase()})`,
+              title: p.title,
+              url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`,
+              snippet: p.extract.trim().slice(0, 950)
+            });
+          }
+        }
+        return results;
+      }
+
+      async function searchDuckDuckGoAndCrossref(searchQuery) {
+        const out = [];
+        const q = encodeURIComponent(searchQuery);
+
+        const [ddgSettled, crSettled] = await Promise.allSettled([
+          fetchWithTimeout(`https://api.duckduckgo.com/?q=${q}&format=json&no_html=1&skip_disambig=1`, {}, 4000)
+            .then(r => r.ok ? r.json() : null),
+          fetchWithTimeout(`https://api.crossref.org/works?query=${q}&rows=2&select=DOI,title,abstract,published`, {}, 4500)
+            .then(r => r.ok ? r.json() : null)
+        ]);
+
+        if (ddgSettled.status === 'fulfilled' && ddgSettled.value) {
+          const d = ddgSettled.value;
+          if (d.AbstractText && d.AbstractText.length > 30) {
+            out.push({
+              sourceType: 'web',
+              provider: d.AbstractSource || 'DuckDuckGo Instant',
+              title: d.Heading || searchQuery,
+              url: d.AbstractURL || `https://duckduckgo.com/?q=${q}`,
+              snippet: d.AbstractText.slice(0, 800)
+            });
+          }
+        }
+
+        if (crSettled.status === 'fulfilled' && crSettled.value?.message?.items) {
+          for (const item of crSettled.value.message.items) {
+            const title = Array.isArray(item.title) ? item.title[0] : '';
+            const rawAbs = item.abstract ? item.abstract.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+            if (title && rawAbs.length > 50) {
+              out.push({
+                sourceType: 'web',
+                provider: 'Crossref Wissenschaft',
+                title,
+                url: item.DOI ? `https://doi.org/${item.DOI}` : 'https://search.crossref.org',
+                snippet: rawAbs.slice(0, 750)
+              });
+            }
+          }
+        }
+        return out;
+      }
+
+      /**
+       * Führt alle Live-Online-Recherchen parallel aus (inkl. direktem Lesen eingefügter URLs).
+       */
+      async function gatherLiveOnlineContext(userQuestion) {
+        const webFindings = [];
+        const urlMatches = userQuestion.match(/https?:\/\/[^\s<>")]+/gi) || [];
+
+        // Suchbegriffe von Frage-Füllwörtern befreien für hohe Wikipedia/Crossref-Trefferquote
+        const keyTokens = tokenizeForSearch(userQuestion.replace(/https?:\/\/[^\s]+/gi, ''), true).slice(0, 6);
+        const condensedQuery = keyTokens.join(' ') || userQuestion.slice(0, 80);
+
+        const tasks = [
+          searchWikipediaLang(condensedQuery, 'de', 2),
+          searchWikipediaLang(condensedQuery, 'en', 2),
+          searchDuckDuckGoAndCrossref(condensedQuery)
+        ];
+
+        // Eingefügte URLs in der Frage live über r.jina.ai lesen und per SDR-Relevanz filtern
+        for (const u of urlMatches.slice(0, 2)) {
+          tasks.push(
+            fetchUrlViaJinaReader(u).then(fullText => {
+              const chunks = smartChunkSection(fullText, 'Live-URL', 850, 500, 120);
+              const qSdr = encodeToSDR(userQuestion, '');
+              const ranked = chunks.map(c => {
+                const sp = splitErrorSDR(qSdr, encodeToSDR(c.text, ''));
+                return { text: c.text, matched: sp.matched.length };
+              }).sort((a, b) => b.matched - a.matched);
+              return ranked.slice(0, 2).map((r, idx) => ({
+                sourceType: 'web',
+                provider: 'Live URL Reader',
+                title: `${u} (Passage ${idx + 1})`,
+                url: u,
+                snippet: r.text
+              }));
+            }).catch(() => [])
+          );
+        }
+
+        const settled = await Promise.allSettled(tasks);
+        for (const s of settled) {
+          if (s.status === 'fulfilled' && Array.isArray(s.value)) {
+            for (const item of s.value) webFindings.push(item);
+          }
+        }
+
+        // Duplikate anhand URL entfernen
+        const seen = new Set();
+        return webFindings.filter(w => {
+          if (seen.has(w.url + w.title)) return false;
+          seen.add(w.url + w.title);
+          return true;
+        }).slice(0, 6);
+      }
+
+      // ===================================================================
+      // 9. KI-PROVIDER-CONNECTOR (FREE AI + GEMINI API + COPILOT + LOKAL)
+      // ===================================================================
+      async function fetchWithExponentialBackoff(url, options, maxRetries = 2) {
+        let delay = 1000;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            const resp = await fetch(url, options);
+            if (resp.status !== 429 && resp.status !== 503) {
+              return resp;
+            }
+            if (attempt === maxRetries) return resp;
+          } catch (err) {
+            if (attempt === maxRetries) throw err;
+          }
+          await new Promise(r => setTimeout(r, delay));
+          delay *= 2;
+        }
+      }
+
+      function buildSystemPrompt(hasLocal, hasOnline) {
+        return [
+          'Du bist der kognitive Wissens-Synthesizer von AdaMind CortexDB v0.2.0.',
+          'Antworte präzise, faktengetreu, strukturiert (mit Markdown-Überschriften, Aufzählungen oder Code/Tabellen wo sinnvoll) auf Deutsch.',
+          'STRIKTE QUELLENREGELN:',
+          hasLocal ? '- Belege Fakten aus den bereitgestellten Datenbank-Chunks exakt im Format [Quelle: Dateiname, Abschnitt/S.].' : '',
+          hasOnline ? '- Belege Fakten aus Live-Webquellen exakt im Format [Web: Titel].' : '',
+          '- Erfinde niemals Fakten, Seitenzahlen oder Quellen (keine Halluzinationen). Wenn die Quellen eine Teilfrage nicht abdecken, benenne dies klar und transparent.'
+        ].filter(Boolean).join('\n');
+      }
+
+      function buildAugmentedUserPrompt(question, localResults, webResults) {
+        const blocks = [];
+        if (localResults.length > 0) {
+          blocks.push('=== LOKALES DATENBANK-WISSEN (HYBRID SDR + BM25+ TREFFER) ===');
+          localResults.forEach((r, idx) => {
+            blocks.push(
+              `[DB-${idx + 1}] Quelle: ${r.chunk.docName} | Ort: ${r.chunk.section} | Relevanz: ${(r.hybridScore * 100).toFixed(1)}%\n` +
+              `Inhalt: ${r.chunk.text}`
+            );
+          });
+        }
+        if (webResults.length > 0) {
+          blocks.push('\n=== LIVE ONLINE-WISSEN (ECHTZEIT-WEBABRUF) ===');
+          webResults.forEach((w, idx) => {
+            blocks.push(
+              `[WEB-${idx + 1}] Titel: ${w.title} (${w.provider}) | URL: ${w.url}\n` +
+              `Auszug: ${w.snippet}`
+            );
+          });
+        }
+        if (blocks.length === 0) {
+          blocks.push('(Hinweis: Für diese Anfrage wurden keine passenden lokalen Chunks oder Online-Quellen gefunden.)');
+        }
+        blocks.push(`\n=== BENUTZERFRAGE ===\n${question}`);
+        return blocks.join('\n\n');
+      }
+
+      /**
+       * Garantierter lokaler Fallback & Offline-Modus:
+       * Extrahiert die informationsdichtesten Sätze aus allen gefundenen Datenbank- und Web-Quellen
+       * mittels Query-Term- & SDR-Salienz-Scoring und baut eine sauber belegte Antwort auf.
+       */
+      function runLocalNeuroSynthesizer(question, localResults, webResults) {
+        const qTokens = tokenizeForSearch(question, true).map(normalizeTerm);
+        const qStems = qTokens.map(lightStem);
+        const candidates = [];
+
+        for (const r of localResults) {
+          const sentences = r.chunk.text.split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(s => s.length >= 25);
+          for (const sent of sentences) {
+            const sNorm = normalizeTerm(sent);
+            let hits = 0;
+            for (const st of qStems) {
+              if (st.length >= 3 && sNorm.includes(st)) hits++;
+            }
+            const score = r.hybridScore * 1.4 + hits * 0.35;
+            candidates.push({
+              score,
+              sentence: sent,
+              citation: `[Quelle: ${r.chunk.docName}, ${r.chunk.section}]`,
+              origin: 'local'
+            });
+          }
+        }
+
+        for (const w of webResults) {
+          const sentences = w.snippet.split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(s => s.length >= 25);
+          for (const sent of sentences) {
+            const sNorm = normalizeTerm(sent);
+            let hits = 0;
+            for (const st of qStems) {
+              if (st.length >= 3 && sNorm.includes(st)) hits++;
+            }
+            candidates.push({
+              score: 0.75 + hits * 0.35,
+              sentence: sent,
+              citation: `[Web: ${w.title}]`,
+              origin: 'web'
+            });
+          }
+        }
+
+        if (candidates.length === 0) {
+          return {
+            text: `### Keine belegbaren Treffer im aktiven Suchraum\n\nZu deiner Anfrage **„${question}“** wurden in den aktuell aktivierten Dokumenten keine ausreichenden Übereinstimmungen gefunden.\n\n- Prüfe links im **Dokumenten-Explorer**, ob alle gewünschten Dateien aktiviert sind, oder importiere weitere **.pdf / .epub / .md / .txt** Dateien.\n- Schalte optional **🌐 Online-Inhalt (Live-Websuche)** hinzu.`,
+            modelLabel: 'AdaMind Neuro-Synthesizer (Lokal)',
+            extraGroundingWeb: []
+          };
+        }
+
+        candidates.sort((a, b) => b.score - a.score);
+        const chosenLocal = [];
+        const chosenWeb = [];
+        const seenText = new Set();
+
+        for (const c of candidates) {
+          const key = c.sentence.slice(0, 60).toLowerCase();
+          if (seenText.has(key)) continue;
+          seenText.add(key);
+          if (c.origin === 'local' && chosenLocal.length < 5) chosenLocal.push(c);
+          else if (c.origin === 'web' && chosenWeb.length < 3) chosenWeb.push(c);
+        }
+
+        const out = [`### Kortikale Wissens-Synthese`];
+        if (chosenLocal.length > 0) {
+          out.push(`**Befunde aus der lokalen Wissensdatenbank:**`);
+          for (const item of chosenLocal) {
+            out.push(`- ${item.sentence} ${item.citation}`);
+          }
+        }
+        if (chosenWeb.length > 0) {
+          out.push(`\n**Ergänzende Live-Online-Befunde:**`);
+          for (const item of chosenWeb) {
+            out.push(`- ${item.sentence} ${item.citation}`);
+          }
+        }
+        return {
+          text: out.join('\n'),
+          modelLabel: 'AdaMind Neuro-Synthesizer (Lokal)',
+          extraGroundingWeb: []
+        };
+      }
+
+      /**
+       * Aufruf der Google Gemini API (sowohl für integrierte kostenlose Canvas-Bridge als auch eigenen API-Key)
+       */
+      async function callGeminiModel({ apiKey, model, systemPrompt, userPrompt, enableGoogleSearch }) {
+        const url = (model === 'gemini-3-flash-preview' && !apiKey)
+          ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`
+          : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${apiKey}`;
+
+        const makePayload = (withSearch) => {
+          const p = {
+            contents: [{ parts: [{ text: userPrompt }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] }
+          };
+          if (withSearch) p.tools = [{ google_search: {} }];
+          return p;
+        };
+
+        let resp = await fetchWithExponentialBackoff(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(makePayload(enableGoogleSearch))
+        });
+
+        // Falls ein spezifisches Modell das Search-Tool ablehnt, sauber ohne Tool wiederholen
+        if (!resp.ok && enableGoogleSearch && resp.status === 400) {
+          resp = await fetchWithExponentialBackoff(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(makePayload(false))
+          });
+        }
+
+        if (!resp.ok) {
+          let errDetail = `HTTP ${resp.status}`;
+          try {
+            const errJson = await resp.json();
+            if (errJson?.error?.message) errDetail = errJson.error.message;
+          } catch (_) {}
+          throw new Error(errDetail);
+        }
+
+        const result = await resp.json();
+        const candidate = result?.candidates?.[0];
+        const parts = candidate?.content?.parts || [];
+        const text = parts.map(p => p.text || '').join('').trim();
+        if (!text) throw new Error('Leere Modellantwort von Gemini erhalten.');
+
+        // Google Search Grounding Metadaten (sowohl groundingAttributions als auch groundingChunks) extrahieren
+        const groundingWeb = [];
+        const gm = candidate?.groundingMetadata;
+        if (gm) {
+          if (Array.isArray(gm.groundingAttributions)) {
+            for (const attr of gm.groundingAttributions) {
+              if (attr?.web?.uri) {
+                groundingWeb.push({
+                  sourceType: 'web',
+                  provider: 'Google Search Grounding',
+                  title: attr.web.title || attr.web.uri,
+                  url: attr.web.uri,
+                  snippet: 'Verifizierte Google-Search-Quelle aus dem Gemini-Grounding.'
+                });
+              }
+            }
+          }
+          if (Array.isArray(gm.groundingChunks)) {
+            for (const ch of gm.groundingChunks) {
+              if (ch?.web?.uri) {
+                groundingWeb.push({
+                  sourceType: 'web',
+                  provider: 'Google Search Grounding',
+                  title: ch.web.title || ch.web.uri,
+                  url: ch.web.uri,
+                  snippet: 'Verifizierte Google-Search-Quelle aus dem Gemini-Grounding.'
+                });
+              }
+            }
+          }
+        }
+
+        return { text, modelLabel: `Gemini (${model})`, extraGroundingWeb: groundingWeb };
+      }
+
+      /**
+       * Aufruf von GitHub / Microsoft Copilot bzw. OpenAI-kompatiblen Chat-Completions-Endpunkten
+       */
+      async function callCopilotOrOpenAI({ endpointUrl, apiKey, model, systemPrompt, userPrompt }) {
+        let bearerToken = apiKey.trim();
+        if (!bearerToken) {
+          throw new Error('Kein Copilot / Bearer API-Key hinterlegt. Öffne oben „KI & API-Keys“.');
+        }
+
+        // Optionaler automatischer Token-Exchange für ghu_ / gho_ OAuth-Tokens bei api.githubcopilot.com
+        if (endpointUrl.includes('api.githubcopilot.com') && /^(ghu_|gho_)/.test(bearerToken)) {
+          try {
+            const exResp = await fetchWithTimeout('https://api.github.com/copilot_internal/v2/token', {
+              method: 'GET',
+              headers: {
+                'Authorization': `token ${bearerToken}`,
+                'Accept': 'application/json'
+              }
+            }, 5000);
+            if (exResp.ok) {
+              const exJson = await exResp.json();
+              if (exJson && exJson.token) bearerToken = exJson.token;
+            }
+          } catch (_) {
+            // Fällt sauber auf direkten Bearer-Aufruf zurück
+          }
+        }
+
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${bearerToken}`
+        };
+        if (endpointUrl.includes('githubcopilot.com')) {
+          headers['Editor-Version'] = 'vscode/1.96.0';
+          headers['Copilot-Integration-Id'] = 'vscode-chat';
+        }
+
+        let resp;
+        try {
+          resp = await fetchWithTimeout(endpointUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: model || 'gpt-4o',
+              temperature: 0.2,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+              ]
+            })
+          }, 28000);
+        } catch (netErr) {
+          if (endpointUrl.includes('api.githubcopilot.com')) {
+            throw new Error(
+              'Netzwerk-/CORS-Blockade durch api.githubcopilot.com im Browser. Wechsle im KI-Menü auf das CORS-fähige Profil „https://models.github.ai/inference/chat/completions“ mit einem GitHub PAT / Models-Key.'
+            );
+          }
+          throw new Error(`Netzwerk-/CORS-Fehler beim Aufruf von ${endpointUrl}: ${netErr.message}`);
+        }
+
+        if (!resp.ok) {
+          let msg = `HTTP ${resp.status}`;
+          try {
+            const ej = await resp.json();
+            msg = ej?.error?.message || ej?.message || msg;
+          } catch (_) {}
+          throw new Error(`Copilot-Endpunkt meldet: ${msg}`);
+        }
+
+        const data = await resp.json();
+        const content = data?.choices?.[0]?.message?.content;
+        if (!content) throw new Error('Unerwartetes Antwortformat vom Copilot-Endpunkt.');
+
+        return {
+          text: content.trim(),
+          modelLabel: `Copilot / ${model}`,
+          extraGroundingWeb: []
+        };
+      }
+
+      /**
+       * Kostenloser CORS-fähiger Cloud-Endpunkt (Pollinations OpenAI-kompatibel)
+       */
+      async function callFreePollinationsCloud(systemPrompt, userPrompt) {
+        const resp = await fetchWithTimeout('https://text.pollinations.ai/openai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'openai',
+            temperature: 0.2,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ]
+          })
+        }, 18000);
+        if (!resp.ok) throw new Error(`Free-Cloud HTTP ${resp.status}`);
+        const data = await resp.json();
+        const txt = data?.choices?.[0]?.message?.content;
+        if (!txt) throw new Error('Leere Free-Cloud-Antwort');
+        return { text: txt.trim(), modelLabel: 'Kostenlose Cloud-KI (OpenAI-Bridge)', extraGroundingWeb: [] };
+      }
+
+      /**
+       * Zentraler KI-Orchestrator mit automatischer Fehlertoleranz
+       */
+      async function generateNeuroRagAnswer(question, localResults, webResults, useOnline) {
+        const sysPrompt = buildSystemPrompt(localResults.length > 0, webResults.length > 0 || useOnline);
+        const usrPrompt = buildAugmentedUserPrompt(question, localResults, webResults);
+        const mode = appState.activeProvider;
+
+        // 1. Reiner Offline-Synthesizer
+        if (mode === 'local_synth' || (mode === 'free' && appState.aiConfig.freeStrategy === 'local_only')) {
+          return runLocalNeuroSynthesizer(question, localResults, webResults);
+        }
+
+        // 2. Eigener Google Gemini API-Key
+        if (mode === 'gemini') {
+          const key = appState.aiConfig.geminiKey.trim();
+          if (!key) {
+            throw new Error('Bitte trage unter „🤖 KI & API-Keys“ deinen Google Gemini API-Key ein oder wähle „Kostenlose KI“.');
+          }
+          const model = appState.aiConfig.geminiModel.trim() || 'gemini-2.5-flash';
+          return await callGeminiModel({
+            apiKey: key,
+            model,
+            systemPrompt: sysPrompt,
+            userPrompt: usrPrompt,
+            enableGoogleSearch: Boolean(useOnline && appState.aiConfig.geminiGrounding)
+          });
+        }
+
+        // 3. GitHub / Microsoft Copilot über API-Key
+        if (mode === 'copilot') {
+          return await callCopilotOrOpenAI({
+            endpointUrl: appState.aiConfig.copilotEndpoint.trim(),
+            apiKey: appState.aiConfig.copilotKey,
+            model: appState.aiConfig.copilotModel.trim() || 'gpt-4o',
+            systemPrompt: sysPrompt,
+            userPrompt: usrPrompt
+          });
+        }
+
+        // 4. Kostenlose KI (Sofort nutzbar ohne eigenen Key — mehrstufige Kaskade)
+        if (appState.aiConfig.freeStrategy === 'cascade') {
+          // Stufe 4a: Integrierte kostenlose Canvas-Gemini-Schnittstelle (gemini-3-flash-preview mit leerem Runtime-Key)
+          try {
+            const apiKey = "";
+            const res = await callGeminiModel({
+              apiKey,
+              model: 'gemini-3-flash-preview',
+              systemPrompt: sysPrompt,
+              userPrompt: usrPrompt,
+              enableGoogleSearch: Boolean(useOnline)
+            });
+            res.modelLabel = 'Kostenlose KI (Gemini 3 Flash)';
+            return res;
+          } catch (_) {
+            // Außerhalb der Laufzeitumgebung nahtlos weiter zu Stufe 4b
+          }
+        }
+
+        // Stufe 4b: Kostenloser CORS-fähiger Pollinations-OpenAI-Endpunkt
+        try {
+          return await callFreePollinationsCloud(sysPrompt, usrPrompt);
+        } catch (_) {
+          // Stufe 4c: Garantierter lokaler AdaMind Neuro-Synthesizer
+          return runLocalNeuroSynthesizer(question, localResults, webResults);
+        }
+      }
+
+      // ===================================================================
+      // 10. XSS-SICHERER MARKDOWN-RENDERER MIT KLICKBAREN QUELLEN-BADGES
+      // ===================================================================
+      function renderMarkdownWithCitations(markdownText) {
+        const raw = String(markdownText || '');
+        const codeBlocks = [];
+
+        // 1. Codeblöcke extrahieren und sichern
+        const fenceRegex = new RegExp(FENCE + '([a-zA-Z0-9_-]*)[ \\t]*\\r?\\n([\\s\\S]*?)' + FENCE, 'g');
+        const withoutCode = raw.replace(fenceRegex, (_, lang, code) => {
+          const token = `\x00CODEBLOCK${codeBlocks.length}\x00`;
+          codeBlocks.push(`<pre><div class="text-[10px] text-cyan-400 mb-1 uppercase">${escapeHtml(lang || 'code')}</div><code>${escapeHtml(code.trim())}</code></pre>`);
+          return `\n${token}\n`;
+        });
+
+        // 2. HTML maskieren
+        const safe = escapeHtml(withoutCode);
+
+        // 3. Inline-Formatierung (Inline-Code & Quellen-Badges vor Bold/Italic kapseln, um Attribut-Korruption zu verhindern)
+        const inlineCodeRegex = new RegExp('\\x60([^\\x60]+)\\x60', 'g');
+        const formatInline = (line) => {
+          const inlineTokens = [];
+          const stash = (htmlSnippet) => {
+            const tok = `\x00INL${inlineTokens.length}\x00`;
+            inlineTokens.push(htmlSnippet);
+            return tok;
+          };
+
+          let out = line
+            .replace(inlineCodeRegex, (_, codeTxt) => stash(`<code class="inline-code">${codeTxt}</code>`))
+            .replace(/\[Quelle:\s*([^\]]+)\]/gi, (_, cite) => {
+              return stash(`<button type="button" data-cite-jump="${cite}" class="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/35 font-mono text-[10px] transition" title="Im Quellen-Inspektor hervorheben">📄 ${cite}</button>`);
+            })
+            .replace(/\[Web:\s*([^\]]+)\]/gi, (_, webTitle) => {
+              return stash(`<button type="button" data-web-jump="${webTitle}" class="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded bg-violet-500/15 hover:bg-violet-500/30 text-violet-200 border border-violet-500/35 font-mono text-[10px] transition" title="Web-Beleg im Quellen-Inspektor zeigen">🌐 ${webTitle}</button>`);
+            })
+            .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gi, (_, label, rawHref) => {
+              const cleanHref = escapeHtml(safeExternalUrl(rawHref));
+              return stash(`<a href="${cleanHref}" target="_blank" rel="noopener noreferrer" class="text-cyan-300 underline hover:text-cyan-200">${label} ↗</a>`);
+            })
+            .replace(/\*\*([^*]+)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+          inlineTokens.forEach((snippet, idx) => {
+            out = out.replace(`\x00INL${idx}\x00`, () => snippet);
+          });
+          return out;
+        };
+
+        // 4. Zeilenweise Block-Strukturen (Überschriften, Tabellen, Listen, Absätze)
+        const lines = safe.split('\n');
+        const htmlOut = [];
+        let inUl = false;
+        let inOl = false;
+        let tableRows = [];
+
+        const flushListsAndTable = () => {
+          if (inUl) { htmlOut.push('</ul>'); inUl = false; }
+          if (inOl) { htmlOut.push('</ol>'); inOl = false; }
+          if (tableRows.length > 0) {
+            if (tableRows.length >= 2) {
+              htmlOut.push('<table><thead><tr>');
+              tableRows[0].forEach(h => htmlOut.push(`<th>${formatInline(h)}</th>`));
+              htmlOut.push('</tr></thead><tbody>');
+              for (let r = 1; r < tableRows.length; r++) {
+                if (tableRows[r].every(cell => /^[-:\s]+$/.test(cell))) continue;
+                htmlOut.push('<tr>');
+                tableRows[r].forEach(c => htmlOut.push(`<td>${formatInline(c)}</td>`));
+                htmlOut.push('</tr>');
+              }
+              htmlOut.push('</tbody></table>');
+            }
+            tableRows = [];
+          }
+        };
+
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (!line) {
+            flushListsAndTable();
+            continue;
+          }
+          if (/^\x00CODEBLOCK\d+\x00$/.test(line)) {
+            flushListsAndTable();
+            htmlOut.push(line);
+            continue;
+          }
+          if (line.startsWith('|') && line.endsWith('|') && line.length > 2) {
+            if (inUl) { htmlOut.push('</ul>'); inUl = false; }
+            if (inOl) { htmlOut.push('</ol>'); inOl = false; }
+            const cells = line.slice(1, -1).split('|').map(c => c.trim());
+            tableRows.push(cells);
+            continue;
+          } else if (tableRows.length > 0) {
+            flushListsAndTable();
+          }
+
+          const hMatch = line.match(/^(#{1,3})\s+(.+)$/);
+          if (hMatch) {
+            flushListsAndTable();
+            const lvl = hMatch[1].length;
+            htmlOut.push(`<h${lvl}>${formatInline(hMatch[2])}</h${lvl}>`);
+            continue;
+          }
+
+          const ulMatch = line.match(/^[-*•]\s+(.+)$/);
+          if (ulMatch) {
+            if (inOl) { htmlOut.push('</ol>'); inOl = false; }
+            if (!inUl) { htmlOut.push('<ul>'); inUl = true; }
+            htmlOut.push(`<li>${formatInline(ulMatch[1])}</li>`);
+            continue;
+          }
+
+          const olMatch = line.match(/^\d+\.\s+(.+)$/);
+          if (olMatch) {
+            if (inUl) { htmlOut.push('</ul>'); inUl = false; }
+            if (!inOl) { htmlOut.push('<ol>'); inOl = true; }
+            htmlOut.push(`<li>${formatInline(olMatch[1])}</li>`);
+            continue;
+          }
+
+          if (line.startsWith('&gt;')) {
+            flushListsAndTable();
+            htmlOut.push(`<blockquote>${formatInline(line.replace(/^&gt;\s*/, ''))}</blockquote>`);
+            continue;
+          }
+
+          flushListsAndTable();
+          htmlOut.push(`<p>${formatInline(line)}</p>`);
+        }
+        flushListsAndTable();
+
+        let finalHtml = htmlOut.join('\n');
+        codeBlocks.forEach((block, idx) => {
+          finalHtml = finalHtml.replace(`\x00CODEBLOCK${idx}\x00`, () => block);
+        });
+        return finalHtml;
+      }
+
+      // ===================================================================
+      // 11. APPLIKATIONSZUSTAND, UI-RENDERING & INTERAKTIVE BINDINGS
+      // ===================================================================
+      const db = new HybridNeuroDatabase(4096);
+
+      const appState = {
+        persistIndexedDB: true,
+        activeProvider: 'free', // 'free' | 'gemini' | 'copilot' | 'local_synth'
+        modalSelectedProvider: 'free',
+        lastQueryTerms: [],
+        lastInspectedLocal: [],
+        lastInspectedWeb: [],
+        highlightedChunkId: null,
+        autoSaveRemainingSec: 60,
+        lastAutoSaveTime: null,
+        aiConfig: {
+          freeStrategy: 'cascade',
+          geminiKey: '',
+          geminiModel: 'gemini-3-flash-preview',
+          geminiGrounding: true,
+          copilotKey: '',
+          copilotEndpoint: 'https://models.github.ai/inference/chat/completions',
+          copilotModel: 'gpt-4o',
+          rememberKeys: true
+        }
+      };
+
+      // 2048-Bit SDR Canvas zeichnen
+      const _roleGrid = new Uint8Array(SDR_DIM);
+
+      function renderSdrCanvas() {
+        const wrap = document.getElementById('sdrCanvasWrap');
+        const canvas = document.getElementById('sdrCanvas');
+        const rect = wrap.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const tw = Math.floor(rect.width * dpr);
+        const th = Math.floor(rect.height * dpr);
+        if (canvas.width !== tw || canvas.height !== th) {
+          canvas.width = tw;
+          canvas.height = th;
+        }
+
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, tw, th);
+
+        _roleGrid.fill(0);
+        const sp = db.lastSplit;
+        for (let i = 0; i < sp.sensory.length; i++) _roleGrid[sp.sensory[i]] = 1;
+        for (let i = 0; i < sp.onError.length; i++) _roleGrid[sp.onError[i]] = 2;
+        for (let i = 0; i < sp.offError.length; i++) _roleGrid[sp.offError[i]] = 3;
+        for (let i = 0; i < sp.matched.length; i++) _roleGrid[sp.matched[i]] = 1;
+
+        const cw = tw / GRID_COLS;
+        const ch = th / GRID_ROWS;
+        const pad = Math.max(1, Math.min(cw, ch) * 0.16);
+        const maxPost = Math.max(4, Math.ceil(db.enabledChunkCount * 0.05));
+
+        for (let r = 0; r < GRID_ROWS; r++) {
+          for (let c = 0; c < GRID_COLS; c++) {
+            const idx = r * GRID_COLS + c;
+            const role = _roleGrid[idx];
+            if (role === 1) ctx.fillStyle = '#22d3ee';
+            else if (role === 2) ctx.fillStyle = '#f43f5e';
+            else if (role === 3) ctx.fillStyle = '#fbbf24';
+            else {
+              const pLen = db.sdrLengths[idx];
+              if (pLen > 0) {
+                const alpha = Math.min(0.62, 0.12 + (pLen / maxPost) * 0.50);
+                ctx.fillStyle = `rgba(56, 189, 248, ${alpha.toFixed(2)})`;
+              } else {
+                ctx.fillStyle = '#0b1324';
+              }
+            }
+            ctx.fillRect(c * cw + pad * 0.5, r * ch + pad * 0.5, Math.max(1, cw - pad), Math.max(1, ch - pad));
+          }
+        }
+      }
+
+      function formatBridgeHex() {
+        const u8 = new Uint8Array(db.bridge.lastBuffer);
+        const limit = Math.min(u8.length, 80);
+        const lines = [];
+        for (let off = 0; off < limit; off += 16) {
+          const slice = u8.subarray(off, Math.min(limit, off + 16));
+          const hex = Array.from(slice).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+          const asc = Array.from(slice).map(b => (b >= 32 && b <= 126) ? String.fromCharCode(b) : '.').join('');
+          lines.push(`${off < 64 ? 'HDR' : 'PAY'} ${off.toString(16).padStart(2, '0')}: ${hex.padEnd(47, ' ')} |${asc}|`);
+        }
+        return lines.join('\n');
+      }
+
+      function syncAllTelemetryAndHeader() {
+        const activeDocs = Array.from(db.documents.values()).filter(d => d.enabled).length;
+        const chunkText = db.enabledChunkCount === db.activeChunkCount
+          ? `${db.enabledChunkCount} Chunks`
+          : `${db.enabledChunkCount}/${db.activeChunkCount} Chunks`;
+        document.getElementById('kpiCorpus').textContent = `${activeDocs}/${db.documents.size} Dok · ${chunkText}`;
+
+        const ms = db.lastLatencyMs;
+        document.getElementById('kpiLatency').textContent = ms < 1.0
+          ? `${ms.toFixed(2)} ms (${Math.round(ms * 1000)} µs)`
+          : `${ms.toFixed(2)} ms`;
+
+        document.getElementById('kpiFreeEnergy').textContent = db.freeEnergy.toFixed(3);
+
+        const provNames = {
+          free: 'Kostenlose KI',
+          gemini: `Gemini (${appState.aiConfig.geminiModel})`,
+          copilot: `Copilot (${appState.aiConfig.copilotModel})`,
+          local_synth: 'Lokal Neuro-Synth'
+        };
+        document.getElementById('kpiActiveModel').textContent = provNames[appState.activeProvider] || 'Kostenlose KI';
+        document.getElementById('quickProviderSelect').value = appState.activeProvider;
+
+        document.getElementById('storageBadgeHeader').textContent = appState.persistIndexedDB
+          ? (appState.lastAutoSaveTime ? `Auto-Save · ${appState.lastAutoSaveTime}` : 'IndexedDB · Auto-Save 60s')
+          : 'Volatile Sandbox-RAM';
+
+        const autoSaveEl = document.getElementById('autoSaveStatusText');
+        if (autoSaveEl) {
+          if (!appState.persistIndexedDB) {
+            autoSaveEl.textContent = '⏸ Auto-Save pausiert (RAM)';
+            autoSaveEl.className = 'text-amber-300 truncate';
+          } else {
+            const stamp = appState.lastAutoSaveTime ? ` · ${appState.lastAutoSaveTime}` : '';
+            autoSaveEl.textContent = `⏱ Auto-Save in ${appState.autoSaveRemainingSec}s${stamp}`;
+            autoSaveEl.className = 'text-emerald-300 truncate';
+          }
+        }
+
+        // Neuromodulatoren
+        const m = db.modulators;
+        document.getElementById('teleACh').textContent = m.ach.toFixed(2);
+        document.getElementById('barTeleACh').style.width = `${Math.round(m.ach * 100)}%`;
+
+        document.getElementById('teleDA').textContent = m.da.toFixed(2);
+        document.getElementById('barTeleDA').style.width = `${Math.round(m.da * 100)}%`;
+
+        document.getElementById('teleArousal').textContent = m.arousal.toFixed(2);
+        document.getElementById('barTeleArousal').style.width = `${Math.round(m.arousal * 100)}%`;
+
+        document.getElementById('teleValence').textContent = (m.valence >= 0 ? '+' : '') + m.valence.toFixed(2);
+        document.getElementById('barTeleValence').style.width = `${Math.round(((m.valence + 1) / 2) * 100)}%`;
+
+        // WorkingMemory (7 Slots)
+        document.getElementById('wmCountText').textContent = `${db.workingMemory.length}/7`;
+        const wmBox = document.getElementById('wmChipsContainer');
+        if (db.workingMemory.length === 0) {
+          wmBox.innerHTML = `<span class="text-[11px] text-slate-500 italic">Ruhepotenzial (-70 mV)</span>`;
+        } else {
+          wmBox.innerHTML = db.workingMemory.map(w => `
+            <button data-wm-cid="${w.chunkId}" class="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-cyan-500/30 text-[10px] font-mono text-cyan-200 transition truncate max-w-[165px]" title="Chunk im Quellen-Inspektor öffnen">
+              #${w.chunkId} ${escapeHtml(w.title)} (${w.activation.toFixed(2)})
+            </button>
+          `).join('');
+        }
+
+        // IsolatedBridge
+        document.getElementById('bridgeCrcMini').textContent =
+          `Seq #${db.bridge.seqId} · CRC 0x${db.bridge.lastHdrCrc.toString(16).padStart(8, '0').toUpperCase()}`;
+        document.getElementById('bridgeHexView').textContent = formatBridgeHex();
+
+        renderSdrCanvas();
+      }
+
+      // Dokumenten-Explorer links rendern
+      function renderDocumentExplorer() {
+        const listEl = document.getElementById('docExplorerList');
+        const docs = Array.from(db.documents.values()).sort((a, b) => b.createdAt - a.createdAt);
+
+        if (docs.length === 0) {
+          listEl.innerHTML = `
+            <div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-center text-xs text-slate-400">
+              Keine Dokumente geladen. Ziehe oben eine Datei (.pdf, .epub, .md, .txt) hinein oder klicke auf <strong>Demo+</strong>.
+            </div>
+          `;
+          return;
+        }
+
+        const badgeColor = {
+          PDF: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+          EPUB: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
+          MD: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+          TXT: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+          WEB: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+          BENCH: 'bg-slate-800 text-slate-300 border-slate-700'
+        };
+
+        listEl.innerHTML = docs.map(d => {
+          const style = badgeColor[d.format] || badgeColor.TXT;
+          const kb = Math.max(1, Math.round(d.charCount / 1024));
+          return `
+            <div class="p-2.5 rounded-xl bg-slate-950/85 border ${d.enabled ? 'border-slate-800 hover:border-slate-700' : 'border-slate-900 opacity-55'} flex items-center justify-between gap-2 transition">
+              <div class="flex items-center gap-2 min-w-0 flex-1">
+                <input type="checkbox" data-doc-toggle="${escapeHtml(d.id)}" ${d.enabled ? 'checked' : ''} class="rounded bg-slate-900 border-slate-700 text-cyan-500 shrink-0 cursor-pointer" title="Dokument für Suche & KI ein-/ausschalten" />
+                <button data-doc-inspect="${escapeHtml(d.id)}" class="text-left min-w-0 flex-1 group">
+                  <div class="flex items-center gap-1.5">
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border ${style}">${escapeHtml(d.format)}</span>
+                    <span class="text-xs font-medium text-slate-200 group-hover:text-cyan-300 truncate transition">${escapeHtml(d.name)}</span>
+                  </div>
+                  <div class="text-[10px] font-mono text-slate-500 mt-0.5">${d.chunkIds.length} Chunks · ~${kb} KB</div>
+                </button>
+              </div>
+              <button data-doc-delete="${escapeHtml(d.id)}" class="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 text-xs transition shrink-0" title="Dokument entfernen">
+                ✕
+              </button>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Suchbegriffe auf dem Rohtext matchen und erst beim Zusammenbau escapen (verhindert &quot;/&amp;-Korruption!)
+      function highlightTermsInText(text, terms) {
+        const raw = String(text == null ? '' : text);
+        if (!terms || terms.length === 0) return escapeHtml(raw);
+        const cleanTerms = Array.from(new Set(
+          terms
+            .filter(t => t && t.length >= 3)
+            .sort((a, b) => b.length - a.length)
+            .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        )).slice(0, 10);
+        if (cleanTerms.length === 0) return escapeHtml(raw);
+
+        const regex = new RegExp(`(${cleanTerms.join('|')})`, 'gi');
+        let out = '';
+        let lastIndex = 0;
+        let match;
+        while ((match = regex.exec(raw)) !== null) {
+          out += escapeHtml(raw.slice(lastIndex, match.index));
+          out += `<mark class="bg-cyan-400/25 text-cyan-100 px-0.5 rounded">${escapeHtml(match[0])}</mark>`;
+          lastIndex = regex.lastIndex;
+          if (match[0].length === 0) regex.lastIndex++;
+        }
+        out += escapeHtml(raw.slice(lastIndex));
+        return out;
+      }
+
+      // Quellen-Inspektor rechts rendern
+      function renderSourceInspector(localResults, webResults, queryTerms, subtitle = 'Abgerufene Belege der aktuellen Anfrage') {
+        appState.lastInspectedLocal = localResults || [];
+        appState.lastInspectedWeb = webResults || [];
+        appState.lastQueryTerms = queryTerms || [];
+
+        document.getElementById('inspectorSubTitle').textContent = subtitle;
+        const total = (localResults?.length || 0) + (webResults?.length || 0);
+        document.getElementById('inspectorCountBadge').textContent = `${total} Beleg${total === 1 ? '' : 'e'}`;
+
+        const box = document.getElementById('sourceInspectorList');
+        if (total === 0) {
+          box.innerHTML = `<p class="text-xs text-slate-500 italic p-2">Keine aktiven Textstellen für diese Auswahl.</p>`;
+          return;
+        }
+
+        const cards = [];
+
+        for (const r of (localResults || [])) {
+          const ch = r.chunk;
+          const isHl = appState.highlightedChunkId === ch.id;
+          cards.push(`
+            <div id="insp-chunk-${ch.id}" class="p-3 rounded-xl border transition ${isHl ? 'bg-cyan-950/45 border-cyan-400 shadow-lg' : 'bg-slate-950/85 border-slate-800'} space-y-1.5">
+              <div class="flex flex-wrap items-center justify-between gap-1.5">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">${escapeHtml(ch.docFormat)}</span>
+                  <span class="text-xs font-semibold text-white truncate">${escapeHtml(ch.docName)}</span>
+                </div>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-900 text-emerald-300 border border-slate-700">${escapeHtml(ch.section)}</span>
+              </div>
+              <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                <span>Hybrid: ${(r.hybridScore * 100).toFixed(1)}% · SDR: ${r.overlapBits}/41 · BM25+: ${r.bm25Score.toFixed(2)}</span>
+                <button data-copy-chunk="${ch.id}" class="text-cyan-400 hover:underline">Kopieren</button>
+              </div>
+              <p class="text-xs text-slate-300 leading-relaxed whitespace-pre-line pt-1 border-t border-slate-800/80">${highlightTermsInText(ch.text, queryTerms)}</p>
+            </div>
+          `);
+        }
+
+        for (let wIdx = 0; wIdx < (webResults || []).length; wIdx++) {
+          const w = webResults[wIdx];
+          const cleanUrl = escapeHtml(safeExternalUrl(w.url));
+          cards.push(`
+            <div id="insp-web-${wIdx}" class="p-3 rounded-xl bg-violet-950/20 border border-violet-500/35 space-y-1.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-violet-500/20 text-violet-200 border border-violet-500/30">🌐 ${escapeHtml(w.provider)}</span>
+                <a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="text-[10px] font-mono text-cyan-300 hover:underline truncate max-w-[180px]">Quelle öffnen ↗</a>
+              </div>
+              <div class="text-xs font-semibold text-white">${escapeHtml(w.title)}</div>
+              <p class="text-xs text-slate-300 leading-relaxed">${highlightTermsInText(w.snippet, queryTerms)}</p>
+            </div>
+          `);
+        }
+
+        box.innerHTML = cards.join('');
+      }
+
+      // ===================================================================
+      // 12. DATEI- & URL-IMPORT HANDLER
+      // ===================================================================
+      async function handleFilesImport(fileList) {
+        const files = Array.from(fileList || []);
+        if (files.length === 0) return;
+
+        const progBox = document.getElementById('importProgressBox');
+        const progLbl = document.getElementById('importProgressLabel');
+        const progPct = document.getElementById('importProgressPct');
+        const progBar = document.getElementById('importProgressBar');
+
+        progBox.classList.remove('hidden');
+        const setProg = (msg, pct) => {
+          progLbl.textContent = msg;
+          progPct.textContent = `${pct}%`;
+          progBar.style.width = `${pct}%`;
+        };
+
+        let importedDocs = 0;
+        let importedChunks = 0;
+
+        for (let fIdx = 0; fIdx < files.length; fIdx++) {
+          const file = files[fIdx];
+          const ext = (file.name.split('.').pop() || '').toLowerCase();
+          setProg(`[${fIdx + 1}/${files.length}] Lese ${file.name}...`, 10);
+
+          try {
+            let chunks = [];
+            let format = 'TXT';
+
+            if (ext === 'pdf') {
+              format = 'PDF';
+              chunks = await extractPdfChunks(file, (m, p) => setProg(m, p));
+            } else if (ext === 'epub') {
+              format = 'EPUB';
+              chunks = await extractEpubChunks(file, (m, p) => setProg(m, p));
+            } else if (ext === 'md' || ext === 'markdown') {
+              format = 'MD';
+              const text = await file.text();
+              setProg(`Markdown-Struktur & Absätze chunken...`, 65);
+              chunks = parseAndChunkMarkdownOrText(text, 'Einleitung');
+            } else if (ext === 'txt') {
+              format = 'TXT';
+              const text = await file.text();
+              setProg(`UTF-8 Textkörper chunken...`, 65);
+              chunks = parseAndChunkMarkdownOrText(text, 'Textabschnitt');
+            } else {
+              throw new Error(`Dateiformat .${ext} wird nicht unterstützt (.txt, .md, .pdf, .epub erlaubt).`);
+            }
+
+            setProg(`Indiziere ${chunks.length} Chunks in 2048-Bit SDR & BM25+...`, 92);
+            await new Promise(r => setTimeout(r, 10));
+
+            const docRec = db.ingestDocument({ name: file.name, format }, chunks);
+            await idbSaveDocument(docRec, chunks);
+            importedDocs++;
+            importedChunks += chunks.length;
+          } catch (err) {
+            showToast(`Fehler bei ${file.name}`, err.message || 'Extraktion fehlgeschlagen.', 'rose');
+          }
+        }
+
+        setProg('Indizierung abgeschlossen!', 100);
+        setTimeout(() => progBox.classList.add('hidden'), 900);
+
+        renderDocumentExplorer();
+        syncAllTelemetryAndHeader();
+        if (importedDocs > 0) {
+          showToast(
+            `${importedDocs} Datei${importedDocs === 1 ? '' : 'en'} erfolgreich importiert`,
+            `${importedChunks} überlappende Wissens-Chunks in SDR + BM25+ indiziert.`,
+            'emerald'
+          );
+        }
+      }
+
+      // Drag & Drop Events
+      const dropZone = document.getElementById('dropZone');
+      const filePickerInput = document.getElementById('filePickerInput');
+
+      ['dragenter', 'dragover'].forEach(evName => {
+        dropZone.addEventListener(evName, e => {
+          e.preventDefault();
+          dropZone.classList.add('border-cyan-400', 'bg-cyan-950/30');
+        });
+      });
+      ['dragleave', 'drop'].forEach(evName => {
+        dropZone.addEventListener(evName, e => {
+          e.preventDefault();
+          dropZone.classList.remove('border-cyan-400', 'bg-cyan-950/30');
+        });
+      });
+      dropZone.addEventListener('drop', e => {
+        if (e.dataTransfer && e.dataTransfer.files) {
+          handleFilesImport(e.dataTransfer.files);
+        }
+      });
+      filePickerInput.addEventListener('change', e => {
+        if (e.target.files) handleFilesImport(e.target.files);
+        filePickerInput.value = '';
+      });
+
+      // Live-URL Import in die Datenbank
+      document.getElementById('btnImportUrl').addEventListener('click', async () => {
+        const input = document.getElementById('urlImportInput');
+        const rawUrl = input.value.trim();
+        if (!/^https?:\/\//i.test(rawUrl)) {
+          showToast('Ungültige URL', 'Bitte gib eine vollständige URL beginnend mit https:// ein.', 'amber');
+          return;
+        }
+        const btn = document.getElementById('btnImportUrl');
+        btn.disabled = true;
+        btn.textContent = '...';
+        try {
+          const text = await fetchUrlViaJinaReader(rawUrl);
+          const chunks = parseAndChunkMarkdownOrText(text, 'Web-Abschnitt');
+          const hostTitle = rawUrl.replace(/^https?:\/\//i, '').slice(0, 55);
+          const docRec = db.ingestDocument({ name: hostTitle, format: 'WEB' }, chunks);
+          await idbSaveDocument(docRec, chunks);
+          input.value = '';
+          renderDocumentExplorer();
+          syncAllTelemetryAndHeader();
+          showToast('Webseite indiziert', `${chunks.length} Chunks von ${hostTitle} lokal gespeichert.`, 'emerald');
+        } catch (err) {
+          showToast('URL-Import fehlgeschlagen', err.message, 'rose');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Laden';
+        }
+      });
+
+      // Freitext / Notiz Import
+      document.getElementById('btnAddRawNote').addEventListener('click', async () => {
+        const titleEl = document.getElementById('rawNoteTitle');
+        const bodyEl = document.getElementById('rawNoteBody');
+        const title = (titleEl.value.trim() || `Notiz_${new Date().toLocaleTimeString('de-DE')}`) + '.md';
+        const body = bodyEl.value.trim();
+        if (!body) {
+          showToast('Leerer Inhalt', 'Bitte gib einen Notiz- oder Dokumenttext ein.', 'amber');
+          return;
+        }
+        const chunks = parseAndChunkMarkdownOrText(body, 'Notiz');
+        const docRec = db.ingestDocument({ name: title, format: 'MD' }, chunks);
+        await idbSaveDocument(docRec, chunks);
+        titleEl.value = '';
+        bodyEl.value = '';
+        renderDocumentExplorer();
+        syncAllTelemetryAndHeader();
+        showToast('Notiz gespeichert', `${chunks.length} Chunks sofort abrufbar.`, 'emerald');
+      });
+
+      // Dokumenten-Explorer Interaktionen (Toggle, Inspect, Delete)
+      document.getElementById('docExplorerList').addEventListener('change', async (e) => {
+        const toggleChk = e.target.closest('input[data-doc-toggle]');
+        if (!toggleChk) return;
+        const docId = toggleChk.getAttribute('data-doc-toggle');
+        db.setDocumentEnabled(docId, toggleChk.checked);
+        renderDocumentExplorer();
+        syncAllTelemetryAndHeader();
+        await idbSyncFullDatabase();
+      });
+
+      document.getElementById('docExplorerList').addEventListener('click', async (e) => {
+        const delBtn = e.target.closest('button[data-doc-delete]');
+        if (delBtn) {
+          const docId = delBtn.getAttribute('data-doc-delete');
+          const doc = db.documents.get(docId);
+          db.deleteDocument(docId);
+          await idbDeleteDocument(docId);
+          renderDocumentExplorer();
+          syncAllTelemetryAndHeader();
+          if (doc) showToast('Dokument entfernt', `${doc.name} wurde aus dem Index gelöscht.`, 'cyan');
+          return;
+        }
+
+        const inspBtn = e.target.closest('button[data-doc-inspect]');
+        if (inspBtn) {
+          const docId = inspBtn.getAttribute('data-doc-inspect');
+          const doc = db.documents.get(docId);
+          if (!doc) return;
+          const previewResults = doc.chunkIds.slice(0, 25).map(cid => ({
+            chunk: db.chunks[cid],
+            hybridScore: 1.0,
+            bm25Score: 0,
+            overlapBits: 41
+          }));
+          renderSourceInspector(previewResults, [], [], `Dokument-Inspektion: ${doc.name}`);
+        }
+      });
+
+      document.getElementById('btnToggleAllDocs').addEventListener('click', async () => {
+        const docs = Array.from(db.documents.values());
+        const anyOff = docs.some(d => !d.enabled);
+        for (const d of docs) db.setDocumentEnabled(d.id, anyOff);
+        renderDocumentExplorer();
+        syncAllTelemetryAndHeader();
+        await idbSyncFullDatabase();
+      });
+
+      document.getElementById('btnRestoreDemo').addEventListener('click', async () => {
+        let added = 0;
+        for (const demo of DEMO_DOCUMENTS) {
+          if (!db.documents.has(demo.id)) {
+            const rec = db.ingestDocument(demo, demo.chunks);
+            await idbSaveDocument(rec, demo.chunks);
+            added++;
+          }
+        }
+        renderDocumentExplorer();
+        syncAllTelemetryAndHeader();
+        showToast('Demo-Wissensbasis aktiv', added > 0 ? `${added} Fachdokumente geladen.` : 'Alle Demo-Dokumente sind bereits vorhanden.', 'cyan');
+      });
+
+      // ===================================================================
+      // 13. KI-CHAT (NEURO-RAG) & SUB-MILLISEKUNDEN ECHTZEIT-SUCHE
+      // ===================================================================
+      const chatMessagesEl = document.getElementById('chatMessages');
+      const ragInputEl = document.getElementById('ragQuestionInput');
+      const btnAskAi = document.getElementById('btnAskAi');
+      let isGenerating = false;
+
+      function appendChatBubble(role, htmlContent, metaFooter = '', msgIndex = 0) {
+        const wrap = document.createElement('div');
+        if (role === 'user') {
+          wrap.className = 'ml-6 sm:ml-12 p-3.5 rounded-2xl bg-cyan-950/45 border border-cyan-500/35 text-xs sm:text-sm text-white';
+          wrap.innerHTML = `<div class="whitespace-pre-line leading-relaxed">${escapeHtml(htmlContent)}</div>${metaFooter}`;
+        } else {
+          wrap.className = 'mr-2 sm:mr-6 p-4 rounded-2xl bg-slate-950/90 border border-slate-800 text-xs sm:text-[13px] text-slate-200 space-y-2.5';
+          wrap.innerHTML = `
+            <div class="md-prose">${htmlContent}</div>
+            <div class="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-slate-400">
+              <span>${metaFooter}</span>
+              <button data-copy-answer="${msgIndex}" class="text-cyan-400 hover:text-cyan-200 transition">Antwort kopieren</button>
+            </div>
+          `;
+        }
+        chatMessagesEl.appendChild(wrap);
+        chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+        return wrap;
+      }
+
+      const answerRawCache = new Map();
+      let msgCounter = 0;
+
+      async function submitRagQuestion() {
+        if (isGenerating) return;
+        const question = ragInputEl.value.trim();
+        if (!question) return;
+
+        const useLocal = document.getElementById('chkUseLocalDb').checked;
+        const useOnline = document.getElementById('chkUseOnlineWeb').checked;
+        const topK = parseInt(document.getElementById('topKSelect').value, 10) || 6;
+
+        if (!useLocal && !useOnline) {
+          showToast('Keine Wissensquelle aktiv', 'Aktiviere mindestens „Datenbank-Wissen“ oder „Online-Inhalt“.', 'amber');
+          return;
+        }
+
+        isGenerating = true;
+        ragInputEl.value = '';
+        document.getElementById('askBtnIcon').textContent = '⏳';
+        document.getElementById('askBtnText').textContent = 'Synthese...';
+
+        const badges = [
+          useLocal ? '<span class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-200">Lokal: AN</span>' : '',
+          useOnline ? '<span class="px-1.5 py-0.5 rounded bg-violet-500/25 text-violet-200">Online: AN</span>' : ''
+        ].filter(Boolean).join(' ');
+        appendChatBubble('user', question, `<div class="mt-2 flex gap-1.5 text-[10px] font-mono">${badges}</div>`);
+
+        // Lade-Platzhalter im Stream
+        const loadingCard = document.createElement('div');
+        loadingCard.className = 'p-3.5 rounded-2xl bg-slate-950/75 border border-slate-800 text-xs font-mono text-cyan-300 flex items-center gap-2.5';
+        loadingCard.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-cyan-400 pulse-live"></span><span id="ragStepStatus">Starte 2048-Bit SDR + BM25+ Hybrid-Retrieval...</span>`;
+        chatMessagesEl.appendChild(loadingCard);
+        chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+
+        const totalT0 = performance.now();
+
+        try {
+          // 1. Paralleler lokaler <2ms Abruf & optionaler Live-Web-Abruf
+          let localResults = [];
+          let retrievalMs = 0;
+          let queryTerms = tokenizeForSearch(question, true);
+
+          if (useLocal) {
+            const searchOut = db.searchHybrid(question, topK, true);
+            localResults = searchOut.results;
+            retrievalMs = searchOut.latencyMs;
+            queryTerms = searchOut.queryTerms;
+          }
+
+          let webResults = [];
+          if (useOnline) {
+            const statusSpan = loadingCard.querySelector('#ragStepStatus');
+            if (statusSpan) statusSpan.textContent = `Lokaler Abruf in ${retrievalMs.toFixed(2)} ms abgeschlossen · Lade Live-Webquellen (Wikipedia, Crossref, URL)...`;
+            webResults = await gatherLiveOnlineContext(question);
+          }
+
+          // Quellen sofort im rechten Quellen-Inspektor mit Keyword-Highlighting anzeigen!
+          renderSourceInspector(localResults, webResults, queryTerms, `Belege zur Frage (${localResults.length} Lokal, ${webResults.length} Web)`);
+          syncAllTelemetryAndHeader();
+
+          const statusSpan = loadingCard.querySelector('#ragStepStatus');
+          if (statusSpan) statusSpan.textContent = `Synthetisiere präzise KI-Antwort über ${document.getElementById('kpiActiveModel').textContent}...`;
+
+          // 2. KI-Synthese ausführen
+          const aiOut = await generateNeuroRagAnswer(question, localResults, webResults, useOnline);
+
+          // Falls Google Search Grounding zusätzliche Web-Links geliefert hat, im Quellen-Inspektor ergänzen
+          if (aiOut.extraGroundingWeb && aiOut.extraGroundingWeb.length > 0) {
+            const mergedWeb = [...webResults];
+            for (const gw of aiOut.extraGroundingWeb) {
+              if (!mergedWeb.some(x => x.url === gw.url)) mergedWeb.push(gw);
+            }
+            webResults = mergedWeb;
+            renderSourceInspector(localResults, webResults, queryTerms, `Belege zur Frage (${localResults.length} Lokal, ${webResults.length} Web)`);
+          }
+
+          loadingCard.remove();
+          msgCounter++;
+          answerRawCache.set(msgCounter, aiOut.text);
+
+          const totalSec = ((performance.now() - totalT0) / 1000).toFixed(2);
+          const footer = `Retrieval: ${retrievalMs.toFixed(2)} ms (${localResults.length} DB / ${webResults.length} Web) · Kern: ${escapeHtml(aiOut.modelLabel)} · Gesamt: ${totalSec}s`;
+          appendChatBubble('assistant', renderMarkdownWithCitations(aiOut.text), footer, msgCounter);
+        } catch (err) {
+          loadingCard.remove();
+          // Selbst bei API-Key-Fehlern des Nutzers liefern wir den Fehlerhinweis + die lokalen Belege!
+          appendChatBubble(
+            'assistant',
+            `<p class="text-rose-300 font-semibold">⚠️ Hinweis der KI-Schnittstelle: ${escapeHtml(err.message)}</p>` +
+            `<p class="text-slate-400">Die relevanten Original-Textstellen wurden trotzdem in <strong>${db.lastLatencyMs.toFixed(2)} ms</strong> gefunden und stehen rechts im <strong>Quellen-Inspektor</strong> bereit. Du kannst oben jederzeit auf <em>Kostenlose KI</em> umschalten.</p>`,
+            'Diagnose-Modus',
+            ++msgCounter
+          );
+        } finally {
+          isGenerating = false;
+          document.getElementById('askBtnIcon').textContent = '➤';
+          document.getElementById('askBtnText').textContent = 'Abfragen';
+        }
+      }
+
+      btnAskAi.addEventListener('click', submitRagQuestion);
+      ragInputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          submitRagQuestion();
+        }
+      });
+
+      // Klickbare Beispiel-Fragen
+      document.getElementById('starterPromptsBar').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-prompt]');
+        if (!btn) return;
+        ragInputEl.value = btn.getAttribute('data-prompt');
+        if (btn.getAttribute('data-web') === 'true') {
+          document.getElementById('chkUseOnlineWeb').checked = true;
+        }
+        submitRagQuestion();
+      });
+
+      // Klick auf [Quelle: ...] oder [Web: ...] Badges in KI-Antworten springt direkt in den Quellen-Inspektor
+      chatMessagesEl.addEventListener('click', (e) => {
+        const copyBtn = e.target.closest('button[data-copy-answer]');
+        if (copyBtn) {
+          const id = parseInt(copyBtn.getAttribute('data-copy-answer'), 10);
+          copyToClipboardSafe(answerRawCache.get(id) || '', 'KI-Antwort');
+          return;
+        }
+
+        const citeBtn = e.target.closest('button[data-cite-jump]');
+        if (citeBtn) {
+          const citeText = citeBtn.getAttribute('data-cite-jump').toLowerCase();
+          const match = appState.lastInspectedLocal.find(r =>
+            citeText.includes(r.chunk.docName.toLowerCase().slice(0, 12)) ||
+            citeText.includes(r.chunk.section.toLowerCase())
+          ) || appState.lastInspectedLocal[0];
+
+          if (match) {
+            appState.highlightedChunkId = match.chunk.id;
+            renderSourceInspector(appState.lastInspectedLocal, appState.lastInspectedWeb, appState.lastQueryTerms);
+            const targetDom = document.getElementById(`insp-chunk-${match.chunk.id}`);
+            if (targetDom) targetDom.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+          return;
+        }
+
+        const webBtn = e.target.closest('button[data-web-jump]');
+        if (webBtn) {
+          const firstWeb = document.getElementById('insp-web-0');
+          if (firstWeb) firstWeb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+
+      document.getElementById('btnClearChat').addEventListener('click', () => {
+        chatMessagesEl.innerHTML = `<div class="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 text-xs text-slate-400">Chatverlauf geleert. Alle ${db.activeChunkCount} indizierten Wissens-Chunks bleiben aktiv.</div>`;
+      });
+
+      // Modus-Umschaltung: KI-RAG <-> Reine Echtzeit-Vektorsuche (<1ms)
+      const modeBtnRag = document.getElementById('modeBtnRag');
+      const modeBtnFastSearch = document.getElementById('modeBtnFastSearch');
+      const viewRagChat = document.getElementById('viewRagChat');
+      const viewFastSearch = document.getElementById('viewFastSearch');
+
+      function setCenterMode(mode) {
+        const isRag = mode === 'rag';
+        viewRagChat.classList.toggle('hidden', !isRag);
+        viewFastSearch.classList.toggle('hidden', isRag);
+        modeBtnRag.className = isRag
+          ? 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 transition'
+          : 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 border border-transparent transition';
+        modeBtnFastSearch.className = !isRag
+          ? 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 transition'
+          : 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 border border-transparent transition';
+        if (!isRag) {
+          document.getElementById('instantSearchInput').focus();
+          runInstantHybridSearch();
+        }
+      }
+
+      modeBtnRag.addEventListener('click', () => setCenterMode('rag'));
+      modeBtnFastSearch.addEventListener('click', () => setCenterMode('fast'));
+
+      function runInstantHybridSearch() {
+        const q = document.getElementById('instantSearchInput').value.trim();
+        const container = document.getElementById('instantResultsContainer');
+        if (!q) {
+          const preview = db.chunks.filter(c => db.aliveFlags[c.id] === 1 && db.docEnabledFlags[c.id] === 1).slice(0, 15);
+          document.getElementById('instantSpeedLabel').textContent = `${db.activeChunkCount} aktive Chunks bereit`;
+          container.innerHTML = preview.map(ch => `
+            <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+              <div class="flex justify-between text-[11px] font-mono">
+                <span class="text-cyan-300 font-semibold">${escapeHtml(ch.docName)}</span>
+                <span class="text-slate-400">${escapeHtml(ch.section)}</span>
+              </div>
+              <p class="text-xs text-slate-300 line-clamp-3">${escapeHtml(ch.text)}</p>
+            </div>
+          `).join('');
+          return;
+        }
+
+        const out = db.searchHybrid(q, 25, true);
+        const us = Math.round(out.latencyMs * 1000);
+        document.getElementById('instantSpeedLabel').textContent =
+          `${out.results.length} Treffer in ${out.latencyMs.toFixed(2)} ms (${us} µs)`;
+
+        renderSourceInspector(out.results.slice(0, 8), [], out.queryTerms, `Echtzeit-Suche: "${q}"`);
+        syncAllTelemetryAndHeader();
+
+        if (out.results.length === 0) {
+          container.innerHTML = `<div class="p-6 text-center text-xs text-slate-400 rounded-xl bg-slate-950/60 border border-slate-800">Keine Treffer für „${escapeHtml(q)}“.</div>`;
+          return;
+        }
+
+        container.innerHTML = out.results.map(r => `
+          <div class="p-3 rounded-xl bg-slate-950/85 hover:bg-slate-900/90 border border-slate-800 transition space-y-1.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-xs font-semibold text-white">${escapeHtml(r.chunk.docName)} · <span class="text-cyan-300 font-mono">${escapeHtml(r.chunk.section)}</span></span>
+              <span class="px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono">
+                Score ${(r.hybridScore * 100).toFixed(1)}% · SDR ${r.overlapBits}/41 · BM25 ${r.bm25Score.toFixed(1)}
+              </span>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">${highlightTermsInText(r.chunk.text, out.queryTerms)}</p>
+            <div class="pt-1 flex justify-end">
+              <button data-ask-chunk="${r.chunk.id}" class="text-[11px] font-mono text-cyan-400 hover:underline">→ Im KI-Chat analysieren</button>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      document.getElementById('instantSearchInput').addEventListener('input', runInstantHybridSearch);
+      document.getElementById('instantResultsContainer').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-ask-chunk]');
+        if (!btn) return;
+        const cid = parseInt(btn.getAttribute('data-ask-chunk'), 10);
+        const ch = db.chunks[cid];
+        if (!ch) return;
+        setCenterMode('rag');
+        ragInputEl.value = `Fasse die Kernaussagen aus ${ch.docName} (${ch.section}) zusammen und erkläre die technischen Zusammenhänge.`;
+        ragInputEl.focus();
+      });
+
+      // Klicks im Quellen-Inspektor & WorkingMemory
+      document.getElementById('sourceInspectorList').addEventListener('click', (e) => {
+        const cBtn = e.target.closest('button[data-copy-chunk]');
+        if (!cBtn) return;
+        const cid = parseInt(cBtn.getAttribute('data-copy-chunk'), 10);
+        if (db.chunks[cid]) copyToClipboardSafe(db.chunks[cid].text, 'Quell-Chunk');
+      });
+
+      document.getElementById('wmChipsContainer').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-wm-cid]');
+        if (!btn) return;
+        const cid = parseInt(btn.getAttribute('data-wm-cid'), 10);
+        if (!db.chunks[cid]) return;
+        appState.highlightedChunkId = cid;
+        renderSourceInspector([{ chunk: db.chunks[cid], hybridScore: 1, bm25Score: 1, overlapBits: 41 }], [], [], 'NMDA Arbeitsgedächtnis-Slot');
+      });
+
+      // ===================================================================
+      // 14. KI-MODAL, VERBINDUNGSTEST, BENCHMARK, SCHLAF, SNAPSHOT & WIPE
+      // ===================================================================
+      const aiModal = document.getElementById('aiModal');
+
+      function selectModalProviderTab(prov) {
+        appState.modalSelectedProvider = prov;
+        document.querySelectorAll('#modalProviderCards .prov-card').forEach(btn => {
+          const active = btn.getAttribute('data-prov') === prov;
+          btn.className = active
+            ? 'prov-card text-left p-3 rounded-xl border transition bg-cyan-950/45 border-cyan-400/70 shadow-lg'
+            : 'prov-card text-left p-3 rounded-xl border transition bg-slate-950/70 border-slate-800 hover:border-slate-700';
+        });
+        document.getElementById('provSectionFree').classList.toggle('hidden', prov !== 'free');
+        document.getElementById('provSectionGemini').classList.toggle('hidden', prov !== 'gemini');
+        document.getElementById('provSectionCopilot').classList.toggle('hidden', prov !== 'copilot');
+        document.getElementById('aiTestResultBox').classList.add('hidden');
+      }
+
+      function openAiModal() {
+        document.getElementById('freeAiStrategySelect').value = appState.aiConfig.freeStrategy;
+        document.getElementById('geminiApiKeyInput').value = appState.aiConfig.geminiKey;
+        document.getElementById('geminiModelCustom').value = appState.aiConfig.geminiModel;
+        const gemPreset = document.getElementById('geminiModelPreset');
+        if (Array.from(gemPreset.options).some(o => o.value === appState.aiConfig.geminiModel)) {
+          gemPreset.value = appState.aiConfig.geminiModel;
+        }
+        document.getElementById('chkGeminiSearchGrounding').checked = appState.aiConfig.geminiGrounding;
+        document.getElementById('copilotApiKeyInput').value = appState.aiConfig.copilotKey;
+        document.getElementById('copilotEndpointUrl').value = appState.aiConfig.copilotEndpoint;
+        const copEndPreset = document.getElementById('copilotEndpointPreset');
+        if (Array.from(copEndPreset.options).some(o => o.value === appState.aiConfig.copilotEndpoint)) {
+          copEndPreset.value = appState.aiConfig.copilotEndpoint;
+        }
+        document.getElementById('copilotModelCustom').value = appState.aiConfig.copilotModel;
+        const copModPreset = document.getElementById('copilotModelPreset');
+        if (Array.from(copModPreset.options).some(o => o.value === appState.aiConfig.copilotModel)) {
+          copModPreset.value = appState.aiConfig.copilotModel;
+        }
+        document.getElementById('chkRememberKeys').checked = appState.aiConfig.rememberKeys;
+
+        const tab = appState.activeProvider === 'local_synth' ? 'free' : appState.activeProvider;
+        selectModalProviderTab(tab);
+        aiModal.classList.remove('hidden');
+        aiModal.classList.add('flex');
+      }
+
+      function closeAiModal() {
+        aiModal.classList.add('hidden');
+        aiModal.classList.remove('flex');
+      }
+
+      document.getElementById('btnOpenAiModal').addEventListener('click', openAiModal);
+      document.getElementById('headerProviderPill').addEventListener('click', openAiModal);
+      document.getElementById('closeAiModalBtn').addEventListener('click', closeAiModal);
+
+      document.getElementById('modalProviderCards').addEventListener('click', (e) => {
+        const card = e.target.closest('button[data-prov]');
+        if (card) selectModalProviderTab(card.getAttribute('data-prov'));
+      });
+
+      // Auge-Icon zum Ein-/Ausblenden der API-Keys & Hintergrundklick zum Schließen
+      aiModal.addEventListener('click', (e) => {
+        if (e.target === aiModal) {
+          closeAiModal();
+          return;
+        }
+        const pwBtn = e.target.closest('button[data-toggle-pw]');
+        if (!pwBtn) return;
+        const inp = document.getElementById(pwBtn.getAttribute('data-toggle-pw'));
+        if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+      });
+
+      document.getElementById('geminiModelPreset').addEventListener('change', (e) => {
+        document.getElementById('geminiModelCustom').value = e.target.value;
+      });
+      document.getElementById('copilotEndpointPreset').addEventListener('change', (e) => {
+        document.getElementById('copilotEndpointUrl').value = e.target.value;
+      });
+      document.getElementById('copilotModelPreset').addEventListener('change', (e) => {
+        document.getElementById('copilotModelCustom').value = e.target.value;
+      });
+
+      function readModalInputsToState() {
+        appState.aiConfig.freeStrategy = document.getElementById('freeAiStrategySelect').value;
+        appState.aiConfig.geminiKey = document.getElementById('geminiApiKeyInput').value.trim();
+        appState.aiConfig.geminiModel = document.getElementById('geminiModelCustom').value.trim() || 'gemini-3-flash-preview';
+        appState.aiConfig.geminiGrounding = document.getElementById('chkGeminiSearchGrounding').checked;
+        appState.aiConfig.copilotKey = document.getElementById('copilotApiKeyInput').value.trim();
+        appState.aiConfig.copilotEndpoint = document.getElementById('copilotEndpointUrl').value.trim();
+        appState.aiConfig.copilotModel = document.getElementById('copilotModelCustom').value.trim() || 'gpt-4o';
+        appState.aiConfig.rememberKeys = document.getElementById('chkRememberKeys').checked;
+      }
+
+      // Live Verbindungs-Test im Modal
+      document.getElementById('btnTestAiConnection').addEventListener('click', async () => {
+        readModalInputsToState();
+        const box = document.getElementById('aiTestResultBox');
+        box.classList.remove('hidden');
+        box.className = 'mt-3 p-3 rounded-xl border border-cyan-500/40 bg-slate-900 text-xs font-mono text-cyan-200';
+        box.textContent = 'Prüfe Endpunkt-Verbindung und Authentifizierung...';
+
+        const t0 = performance.now();
+        try {
+          const prov = appState.modalSelectedProvider;
+          let reply;
+          if (prov === 'gemini') {
+            if (!appState.aiConfig.geminiKey) throw new Error('Kein Gemini API-Key eingegeben.');
+            reply = await callGeminiModel({
+              apiKey: appState.aiConfig.geminiKey,
+              model: appState.aiConfig.geminiModel,
+              systemPrompt: 'Antworte exakt mit: OK',
+              userPrompt: 'Ping',
+              enableGoogleSearch: false
+            });
+          } else if (prov === 'copilot') {
+            reply = await callCopilotOrOpenAI({
+              endpointUrl: appState.aiConfig.copilotEndpoint,
+              apiKey: appState.aiConfig.copilotKey,
+              model: appState.aiConfig.copilotModel,
+              systemPrompt: 'Antworte exakt mit: OK',
+              userPrompt: 'Ping'
+            });
+          } else {
+            const prevProv = appState.activeProvider;
+            appState.activeProvider = 'free';
+            reply = await generateNeuroRagAnswer('Systemtest', [{ chunk: db.chunks[0] || { docName: 'System', section: 'Core', text: 'AdaMind v0.2.1 Verbindungstest aktiv.' }, hybridScore: 1 }], [], false);
+            appState.activeProvider = prevProv;
+          }
+          const ms = Math.round(performance.now() - t0);
+          box.className = 'mt-3 p-3 rounded-xl border border-emerald-500/50 bg-emerald-950/30 text-xs font-mono text-emerald-200';
+          box.textContent = `✅ Verbindung erfolgreich (${ms} ms) · Kern: ${reply.modelLabel} · Antwort: "${reply.text.slice(0, 70)}"`;
+        } catch (err) {
+          box.className = 'mt-3 p-3 rounded-xl border border-rose-500/50 bg-rose-950/35 text-xs font-mono text-rose-200';
+          box.textContent = `❌ Diagnose: ${err.message}`;
+        }
+      });
+
+      document.getElementById('btnSaveAiModal').addEventListener('click', async () => {
+        readModalInputsToState();
+        appState.activeProvider = appState.modalSelectedProvider;
+        if (appState.aiConfig.rememberKeys && appState.persistIndexedDB) {
+          await idbSaveAiSettings();
+        } else {
+          await idbDeleteAiSettings();
+        }
+        syncAllTelemetryAndHeader();
+        closeAiModal();
+        showToast('KI-Konfiguration aktiviert', `Aktiver Synthese-Kern: ${document.getElementById('kpiActiveModel').textContent}`, 'emerald');
+      });
+
+      document.getElementById('quickProviderSelect').addEventListener('change', (e) => {
+        const val = e.target.value;
+        appState.activeProvider = val;
+        if ((val === 'gemini' && !appState.aiConfig.geminiKey) || (val === 'copilot' && !appState.aiConfig.copilotKey)) {
+          openAiModal();
+        }
+        syncAllTelemetryAndHeader();
+      });
+
+      // +1.000 CHUNKS HIGH-SPEED BENCHMARK
+      document.getElementById('btnBenchmark').addEventListener('click', async () => {
+        const topics = [
+          ['Thalamokortikale Oszillation', 'Synchronisiert 40-Hz-Gamma-Schleifen zwischen Pulvinar und Lamina IV zur kohärenten Merkmalsbindung.'],
+          ['Hippocampale CA3-Rekurrenz', 'Vervollständigt verrauschte Eingabemuster (Pattern Completion) über dichte autoassoziative Kollateralen.'],
+          ['Striatale Dopamin-Plastizität', 'Moduliert das Gleichgewicht zwischen direktem D1-Pfad und indirektem D2-Pfad anhand des TD-Vorhersagefehlers.'],
+          ['Lock-freier Shared-Memory-Ring', 'Garantiert Zero-Copy-Durchsatz über atomare Acquire-Release-Zeiger und 64-Byte Cacheline-Ausrichtung.'],
+          ['Cholinerge Präzisionssteuerung', 'Erhöht bei unerwarteten Kontingenzwechseln die Verstärkung sensorischer Vorhersagefehler im Kortex.']
+        ];
+
+        const synthChunks = [];
+        const tWrite0 = performance.now();
+        for (let i = 1; i <= 1000; i++) {
+          const t = topics[i % topics.length];
+          synthChunks.push({
+            section: `S. ${Math.ceil(i / 4)} (Knoten #${i})`,
+            text: `${t[0]} [Experiment-${i}]: ${t[1]} Gemessene Membranleitfähigkeit ${(0.45 + (i % 17) * 0.03).toFixed(2)} nS bei 2048-Bit SDR Sparsity.`
+          });
+        }
+        const benchDoc = db.ingestDocument({
+          name: `Benchmark_Korpus_${db.documents.size + 1}_1000_Chunks.pdf`,
+          format: 'BENCH'
+        }, synthChunks);
+        const writeMs = performance.now() - tWrite0;
+
+        // Live-Abrufgeschwindigkeit über den vergrößerten Korpus messen
+        const qOut = db.searchHybrid('Thalamokortikale Gamma Lamina Ringpuffer', 8, true);
+        renderDocumentExplorer();
+        renderSourceInspector(qOut.results, [], qOut.queryTerms, `Benchmark-Testabruf (${qOut.latencyMs.toFixed(2)} ms)`);
+        syncAllTelemetryAndHeader();
+        await idbSaveDocument(benchDoc, synthChunks);
+
+        showToast(
+          '⚡ +1.000 Chunks Benchmark abgeschlossen',
+          `1.000 Chunks doppelt indiziert (SDR + BM25+) in ${writeMs.toFixed(1)} ms · Hybrid-Abruf über ${db.enabledChunkCount} Chunks: ${qOut.latencyMs.toFixed(2)} ms.`,
+          'cyan'
+        );
+      });
+
+      // SCHLAFZYKLUS (NREM / REM)
+      document.getElementById('btnSleepCycle').addEventListener('click', async () => {
+        const rep = db.runSleepCycle();
+        syncAllTelemetryAndHeader();
+        await idbSyncFullDatabase();
+        showToast(
+          '🌙 NREM/REM Schlafkonsolidierung abgeschlossen',
+          `${rep.boosted} aktive Arbeitsgedächtnis-Spuren synaptisch verstärkt (LTP) und ${rep.activeChunks} Chunks homöostatisch skaliert (SHY).`,
+          'violet'
+        );
+      });
+
+      // PERSISTENZ-MODUS UMSCHALTEN
+      document.getElementById('chkPersistenceMode').addEventListener('change', async (e) => {
+        appState.persistIndexedDB = e.target.checked;
+        if (!appState.persistIndexedDB) {
+          await idbClearAll();
+          showToast('Volatile Sandbox-RAM aktiv', 'IndexedDB wurde geleert. Neue Importe verbleiben ausschließlich flüchtig im Arbeitsspeicher.', 'amber');
+        } else {
+          await idbSyncFullDatabase();
+          if (appState.aiConfig.rememberKeys) {
+            await idbSaveAiSettings();
+          }
+          showToast('IndexedDB Persistenz aktiv', 'Aktuelle Datenbank und künftige Importe werden lokal im Browser-Tresor gespeichert.', 'emerald');
+        }
+        syncAllTelemetryAndHeader();
+      });
+
+      // JSON SNAPSHOT EXPORT / IMPORT (inkl. LTP-Synapsengewichten)
+      document.getElementById('btnExportSnapshot').addEventListener('click', () => {
+        const docsOut = [];
+        for (const doc of db.documents.values()) {
+          docsOut.push({
+            id: doc.id,
+            name: doc.name,
+            format: doc.format,
+            enabled: doc.enabled,
+            createdAt: doc.createdAt,
+            chunks: doc.chunkIds.map(cid => ({
+              section: db.chunks[cid].section,
+              text: db.chunks[cid].text,
+              ltp: Number(db.ltpWeights[cid].toFixed(4))
+            }))
+          });
+        }
+        const blob = new Blob([JSON.stringify({ version: '0.2.1', exportedAt: new Date().toISOString(), documents: docsOut }, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `adamind-cortexdb-v0.2.1-${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('JSON-Snapshot exportiert', `${docsOut.length} Dokumente inkl. Synapsengewichten gesichert.`, 'emerald');
+      });
+
+      document.getElementById('snapshotFileInput').addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        try {
+          const parsed = JSON.parse(await file.text());
+          if (!parsed || !Array.isArray(parsed.documents)) throw new Error('Ungültiges Snapshot-Format');
+          let count = 0;
+          for (const d of parsed.documents) {
+            if (d.name && Array.isArray(d.chunks)) {
+              const rec = db.ingestDocument({
+                name: d.name,
+                format: d.format || 'JSON',
+                enabled: d.enabled !== false,
+                createdAt: d.createdAt || Date.now()
+              }, d.chunks);
+              await idbSaveDocument(rec, d.chunks);
+              count++;
+            }
+          }
+          renderDocumentExplorer();
+          syncAllTelemetryAndHeader();
+          showToast('Snapshot geladen', `${count} Dokumente wiederhergestellt.`, 'emerald');
+        } catch (err) {
+          showToast('Snapshot-Fehler', err.message, 'rose');
+        }
+        e.target.value = '';
+      });
+
+      // ZERO-WIPE MODAL & AUSFÜHRUNG
+      const wipeModal = document.getElementById('wipeModal');
+      function closeWipeModal() {
+        wipeModal.classList.add('hidden');
+        wipeModal.classList.remove('flex');
+      }
+      document.getElementById('btnZeroWipe').addEventListener('click', () => {
+        wipeModal.classList.remove('hidden');
+        wipeModal.classList.add('flex');
+      });
+      document.getElementById('cancelWipeBtn').addEventListener('click', closeWipeModal);
+      wipeModal.addEventListener('click', (e) => {
+        if (e.target === wipeModal) closeWipeModal();
+      });
+      document.getElementById('confirmWipeBtn').addEventListener('click', async () => {
+        db.zeroWipeAll();
+        await idbClearAll();
+        closeWipeModal();
+        renderDocumentExplorer();
+        renderSourceInspector([], [], [], 'VolatileVault genullt (0x00)');
+        syncAllTelemetryAndHeader();
+        showToast('☢️ Zero-Wipe durchgeführt', 'Alle SDR-TypedArrays, BM25+-Listen und IndexedDB-Einträge wurden gelöscht.', 'rose');
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (!aiModal.classList.contains('hidden')) closeAiModal();
+          if (!wipeModal.classList.contains('hidden')) closeWipeModal();
+        }
+      });
+
+      // ===================================================================
+      // 15. INITIALISIERUNG BEIM START & 60-SEKUNDEN AUTO-SAVE SCHEDULER
+      // ===================================================================
+      let autoSaveTimerId = null;
+
+      function startAutoSaveScheduler() {
+        if (autoSaveTimerId) clearInterval(autoSaveTimerId);
+        appState.autoSaveRemainingSec = 60;
+
+        autoSaveTimerId = setInterval(async () => {
+          if (!appState.persistIndexedDB || isSyncingDatabase) return;
+          try {
+            appState.autoSaveRemainingSec -= 1;
+            if (appState.autoSaveRemainingSec <= 0) {
+              appState.autoSaveRemainingSec = 60;
+              await idbSyncFullDatabase();
+              syncAllTelemetryAndHeader();
+            } else {
+              const autoSaveEl = document.getElementById('autoSaveStatusText');
+              if (autoSaveEl) {
+                const stamp = appState.lastAutoSaveTime ? ` · ${appState.lastAutoSaveTime}` : '';
+                autoSaveEl.textContent = `⏱ Auto-Save in ${appState.autoSaveRemainingSec}s${stamp}`;
+              }
+            }
+          } catch (_) {}
+        }, 1000);
+      }
+
+      document.getElementById('btnSaveNow').addEventListener('click', async () => {
+        if (!appState.persistIndexedDB) {
+          showToast('Persistenz deaktiviert', 'Schalte zuerst „Lokale Persistenz (IndexedDB)“ ein, um dauerhaft zu speichern.', 'amber');
+          return;
+        }
+        const res = await idbSyncFullDatabase();
+        syncAllTelemetryAndHeader();
+        showToast('Datenbank gesichert', `${res.savedDocs} Dokumente inkl. LTP-Synapsengewichten in IndexedDB gespeichert.`, 'emerald');
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && appState.persistIndexedDB) {
+          idbSyncFullDatabase();
+        }
+      });
+
+      window.addEventListener('pagehide', () => {
+        if (appState.persistIndexedDB) {
+          idbSyncFullDatabase();
+        }
+      });
+
+      window.addEventListener('load', async () => {
+        let savedSettings = null;
+        try {
+          savedSettings = await idbLoadAiSettings();
+        } catch (_) {}
+
+        if (savedSettings && savedSettings.aiConfig) {
+          Object.assign(appState.aiConfig, savedSettings.aiConfig);
+          if (savedSettings.activeProvider) {
+            appState.activeProvider = savedSettings.activeProvider;
+          }
+        }
+
+        let storedDocs = [];
+        try {
+          storedDocs = await idbLoadAllDocuments();
+        } catch (_) {}
+
+        if (storedDocs && storedDocs.length > 0) {
+          for (const sd of storedDocs) {
+            if (Array.isArray(sd.chunks) && sd.chunks.length > 0) {
+              db.ingestDocument(sd, sd.chunks);
+            }
+          }
+          appState.lastAutoSaveTime = new Date().toLocaleTimeString('de-DE');
+        } else {
+          // Erststart: Vorinstallierte Demo-Wissensbasis indizieren
+          for (const demo of DEMO_DOCUMENTS) {
+            db.ingestDocument(demo, demo.chunks);
+          }
+          await idbSyncFullDatabase();
+        }
+
+        // Initialen Probe-Abruf ausführen, damit SDR-Matrix & Quellen-Inspektor sofort lebendig sind
+        const initProbe = db.searchHybrid('AdaMind 2048-Bit SDR Free-Energy IsolatedBridge', 4, true);
+        renderDocumentExplorer();
+        renderSourceInspector(initProbe.results, [], initProbe.queryTerms, 'Bereit — Initialer Kortex-Resonanzscan');
+        syncAllTelemetryAndHeader();
+        startAutoSaveScheduler();
+
+        window.addEventListener('resize', renderSdrCanvas);
+        if (typeof ResizeObserver !== 'undefined') {
+          new ResizeObserver(renderSdrCanvas).observe(document.getElementById('sdrCanvasWrap'));
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
+<!-- AdaMind CortexDB v0.2.1 — Geprüft & Bereinigt -->
+<!-- EOF AdaMind CortexDB -->
